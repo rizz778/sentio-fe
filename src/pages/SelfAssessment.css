@@ -1,0 +1,8 @@
+/* Clean helper styles for Self Assessment page */
+.self-assessment-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.self-assessment-card:hover {
+  transform: translateY(-4px);
+}
