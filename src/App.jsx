@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
+import { useAuth } from "./hooks/useAuth";
 import "./App.css";
 
 // Lazy-loaded pages (Code Splitting for fast startup and lightweight memory)
@@ -30,7 +31,7 @@ const PageLoader = () => (
 );
 
 function App() {
-  const isAuthenticated = true;
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -59,7 +60,7 @@ function App() {
           <Route path="/twotabpage" element={isAuthenticated ? <TwoTabPage /> : <Navigate to="/login" />} />
           <Route path="/chat" element={isAuthenticated ? <ChatPage /> : <Navigate to="/login" />} />
           <Route path="/profile" element={isAuthenticated ? <ProfilePage /> : <Navigate to="/login" />} />
-          <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/dashboard" />} />
+          <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
         </Routes>
       </Suspense>
     </div>

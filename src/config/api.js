@@ -17,8 +17,6 @@ export const WS_GATEWAY_URL =
 export const API_ENDPOINTS = {
   AUTH: {
     GOOGLE: "/auth/google",
-    LOGIN: "/api/auth/login",
-    SIGNUP: "/api/auth/signup",
     ME: "/auth/me",
   },
   SESSIONS: {

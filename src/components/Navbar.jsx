@@ -1,7 +1,8 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import logo6 from '../assets/images/logo6.jpg';
-import axios from 'axios';
+import { fetchUserProfile } from "../services/profileApi";
+import { logout } from "../utils/auth";
 
 const Navbar = () => {
   const location = useLocation();
@@ -12,21 +13,18 @@ const Navbar = () => {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const loadProfile = async () => {
       if (isAuthenticated) {
         try {
-          const token = localStorage.getItem("token");
-          const response = await axios.get('https://emot-chtabot-1.onrender.com/api/profile', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          setUserProfile(response.data.userProfile);
+          const profile = await fetchUserProfile();
+          setUserProfile(profile);
         } catch (error) {
           console.error("Error fetching user profile:", error);
         }
       }
     };
 
-    fetchUserProfile();
+    loadProfile();
   }, [isAuthenticated]);
 
   useEffect(() => {
@@ -43,7 +41,7 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    logout();
     setIsAuthenticated(false);
     setUserProfile(null);
     setDropdownOpen(false);

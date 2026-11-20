@@ -1,16 +1,11 @@
 /**
- * useAuth.js — Hook: Authentication Management
- * ==============================================
- * Centralises user session, authentication actions, and tokens.
+ * useAuth.js — Hook: Authentication Management (Google Auth)
+ * ============================================================
+ * Centralises user session, Google OAuth authentication, and token management.
  */
 
-import { useState, useCallback, useEffect } from "react";
-import {
-  loginWithGoogle,
-  loginWithEmail,
-  signupWithEmail,
-  fetchCurrentUser,
-} from "../services/authApi";
+import { useState, useCallback } from "react";
+import { loginWithGoogle, fetchCurrentUser } from "../services/authApi";
 import { getToken, getUser, logout as clearAuthStorage } from "../utils/auth";
 
 export const useAuth = () => {
@@ -51,42 +46,6 @@ export const useAuth = () => {
     [saveAuthSession]
   );
 
-  const signInWithEmail = useCallback(
-    async (email, password) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await loginWithEmail(email, password);
-        saveAuthSession(data);
-        return data;
-      } catch (err) {
-        setError(err.message);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [saveAuthSession]
-  );
-
-  const signUp = useCallback(
-    async (username, email, password) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await signupWithEmail(username, email, password);
-        saveAuthSession(data);
-        return data;
-      } catch (err) {
-        setError(err.message);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [saveAuthSession]
-  );
-
   const signOut = useCallback(() => {
     clearAuthStorage();
     setToken(null);
@@ -114,8 +73,6 @@ export const useAuth = () => {
     loading,
     error,
     signInWithGoogle,
-    signInWithEmail,
-    signUp,
     signOut,
     refreshUser,
   };

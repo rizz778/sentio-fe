@@ -1,44 +1,32 @@
 import React from 'react';
-import { Form, Input, Button, Row, Col, Typography, Divider, Checkbox, message } from 'antd';
-import { MailOutlined, LockOutlined, GoogleOutlined, FacebookFilled } from '@ant-design/icons';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Row, Col, Typography, message } from 'antd';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../hooks/useAuth';
 import './Login.css';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 const Login = () => {
-  const { signInWithEmail, signInWithGoogle, loading } = useAuth();
-  const [form] = Form.useForm();
+  const { signInWithGoogle, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  // Get client ID from environment variables
   const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
-  const handleSubmit = async (values) => {
-    const { email, password } = values;
-    try {
-      await signInWithEmail(email, password);
-      message.success('Login successful!');
-      const redirectPath = location.state?.from?.pathname || "/chat";
-      navigate(redirectPath);
-    } catch (error) {
-      console.error('Login error:', error);
-      message.error(error.message || 'Login failed. Please try again.');
-    }
-  };
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
       const { credential } = credentialResponse;
+      if (!credential) {
+        message.error('No credential received from Google.');
+        return;
+      }
       await signInWithGoogle(credential);
-      message.success('Google login successful!');
-      const redirectPath = location.state?.from?.pathname || "/chat";
+      message.success('Signed in successfully!');
+      const redirectPath = location.state?.from?.pathname || '/chat';
       navigate(redirectPath);
     } catch (error) {
       console.error('Google login error:', error);
-      message.error(error.message || 'Google login failed. Please try again.');
+      message.error(error.message || 'Google authentication failed. Please try again.');
     }
   };
 
@@ -46,104 +34,39 @@ const Login = () => {
     <div className="login-container">
       <Row justify="center" align="middle" style={{ minHeight: '100vh' }}>
         <Col xs={24} sm={20} md={16} lg={12} xl={8}>
-          <div className="login-card">
-            <Title level={2} className="login-title" style={{ color: "#f64a8a" }}>
-              Welcome Back
+          <div className="login-card" style={{ textAlign: 'center', padding: '40px 32px' }}>
+            <Title level={2} className="login-title" style={{ color: '#f64a8a', marginBottom: 8 }}>
+              Welcome to Sentio
             </Title>
-            <Text type="secondary" className="login-subtitle">
-              Please sign in to continue
-            </Text>
+            <Paragraph type="secondary" style={{ fontSize: '15px', marginBottom: 32 }}>
+              Your compassionate, AI-powered mental wellness companion. Sign in securely with your Google account to begin.
+            </Paragraph>
 
-            <Form
-              form={form}
-              name="login-form"
-              initialValues={{ remember: true }}
-              onFinish={handleSubmit}
-              className="login-form"
-            >
-              <Form.Item
-                name="email"
-                rules={[
-                  { required: true, message: 'Please input your email!' },
-                  { type: 'email', message: 'Please enter a valid email!' }
-                ]}
-              >
-                <Input
-                  prefix={<MailOutlined />}
-                  placeholder="Email"
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
+              <GoogleOAuthProvider clientId={CLIENT_ID}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => message.error('Google Sign-In failed. Please try again.')}
+                  useOneTap
+                  theme="filled_blue"
                   size="large"
+                  text="signin_with"
+                  shape="pill"
+                  width="280"
                 />
-              </Form.Item>
+              </GoogleOAuthProvider>
+            </div>
 
-              <Form.Item
-                name="password"
-                rules={[{ required: true, message: 'Please input your password!' }]}
-              >
-                <Input.Password
-                  prefix={<LockOutlined />}
-                  placeholder="Password"
-                  size="large"
-                />
-              </Form.Item>
+            {loading && <Text type="secondary">Authenticating with Sentio...</Text>}
 
-              <Form.Item>
-                <Row justify="space-between">
-                  <Form.Item name="remember" valuePropName="checked" noStyle>
-                    <Checkbox>Remember me</Checkbox>
-                  </Form.Item>
-                  <Link to="/forgot-password">Forgot password?</Link>
-                </Row>
-              </Form.Item>
-
-              <Form.Item>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  size="large"
-                  loading={loading}
-                  block
-                  style={{ backgroundColor: "#f64a8a" }}
-                >
-                  Sign In
-                </Button>
-              </Form.Item>
-
-              <Divider plain>Or continue with</Divider>
-
-              <div className="social-login-container">
-                <GoogleOAuthProvider clientId={CLIENT_ID}>
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={() => message.error('Google login failed. Please try again.')}
-                    useOneTap
-                    theme="filled_blue"
-                    size="large"
-                    width="100%"
-                    text="signin_with"
-                    logo_alignment="center"
-                  />
-                </GoogleOAuthProvider>
-                
-                <Button
-                  icon={<FacebookFilled />}
-                  size="large"
-                  className="facebook-login-btn"
-                  block
-                  style={{ 
-                    backgroundColor: "#3b5998", 
-                    color: "white",
-                    marginTop: "10px" 
-                  }}
-                >
-                  Continue with Facebook
-                </Button>
-              </div>
-
-              <div className="register-cta">
-                <Text>Don't have an account? </Text>
-                <Link to="/signup">Create account</Link>
-              </div>
-            </Form>
+            <div style={{ marginTop: 32, borderTop: '1px solid #f0f0f0', paddingTop: 20 }}>
+              <Text type="secondary" style={{ fontSize: '13px' }}>
+                By signing in, you agree to our{' '}
+                <Link to="/terms" style={{ color: '#f64a8a' }}>Terms of Service</Link>{' '}
+                and{' '}
+                <Link to="/privacy" style={{ color: '#f64a8a' }}>Privacy Policy</Link>.
+              </Text>
+            </div>
           </div>
         </Col>
       </Row>
