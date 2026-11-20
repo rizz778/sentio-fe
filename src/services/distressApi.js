@@ -1,17 +1,9 @@
-
-import { geminiClient } from "./apiClient";
-
 /**
- * Analyse the distress level of a user's message.
- *
- * @param {string}   inputText           - The raw user message text
- * @param {object[]} conversationHistory - Sanitised history array
- * @returns {Promise<{ score: number }>} Score object from the backend
+ * distressApi.js — Deprecated
+ * =============================
+ * Distress scoring is handled automatically on each turn by the backend
+ * turn processor and broadcast over the live WebSocket as a `distress_update` frame.
+ * The frontend does not make explicit HTTP distress scoring requests.
  */
-export const analyzeDistressScore = async (inputText, conversationHistory = []) => {
-  const res = await geminiClient.post("/api/distress-score", {
-    text: inputText,
-    conversationHistory,
-  });
-  return res.data;
-};
+
+export const analyzeDistressScore = async () => ({ score: 0 });

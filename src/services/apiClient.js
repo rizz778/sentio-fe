@@ -1,24 +1,26 @@
 import axios from "axios";
-
-// will be replaced by api gateway single point of communication
-
-export const NODE_BACKEND_URL =
-  import.meta.env.VITE_NODE_BACKEND_URL || "http://localhost:4000";
-
-export const GEMINI_BACKEND_URL =
-  import.meta.env.VITE_GEMINI_BACKEND_URL || "http://localhost:8000";
+import { GATEWAY_URL } from "../config/api";
 
 const authHeader = () => {
   const token = localStorage.getItem("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const createApiClient = (baseURL) => {
-  const client = axios.create({ baseURL });
+/**
+ * Creates an axios client configured to route through the Sentio API Gateway.
+ *
+ * @param {string|null} serviceName - Downstream service target ('node-backend' | 'fastapi-backend' | null)
+ */
+const createGatewayClient = (serviceName) => {
+  const client = axios.create({ baseURL: GATEWAY_URL });
 
   client.interceptors.request.use(
     (config) => {
-      config.headers = { ...config.headers, ...authHeader() };
+      config.headers = {
+        ...config.headers,
+        ...authHeader(),
+        ...(serviceName ? { "x-sentio-service": serviceName } : {}),
+      };
       return config;
     },
     (error) => Promise.reject(error)
@@ -29,6 +31,7 @@ const createApiClient = (baseURL) => {
     (error) => {
       const message =
         error.response?.data?.message ||
+        error.response?.data?.error ||
         error.response?.statusText ||
         error.message ||
         "Unknown API error";
@@ -39,6 +42,7 @@ const createApiClient = (baseURL) => {
   return client;
 };
 
-
-export const nodeClient = createApiClient(NODE_BACKEND_URL);
-export const geminiClient = createApiClient(GEMINI_BACKEND_URL);
+// Proxied clients through API Gateway
+export const nodeClient = createGatewayClient("node-backend");
+export const geminiClient = createGatewayClient("fastapi-backend");
+export const gatewayClient = createGatewayClient(null); // Direct gateway endpoints (/auth/google, etc.)

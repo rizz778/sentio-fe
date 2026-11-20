@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
 import {
+  fetchUserProfile,
+  saveUserProfile,
+  uploadProfilePicture,
+  deleteProfilePicture,
+} from "../services/profileApi";
+import {
   User,
   Mail,
   Edit2,
@@ -78,28 +84,7 @@ const ProfilePage = () => {
         try {
           setIsUploading(true);
 
-          const token = localStorage.getItem("token"); // Retrieve token from localStorage
-          if (!token) {
-            console.error("No token found in localStorage");
-            return;
-          }
-
-          // Call API to delete the profile picture from Cloudinary
-          const response = await fetch(
-            "http://localhost:4000/api/profile/delete-picture",
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token}`, // Include token for authentication
-              },
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error(
-              `Failed to delete profile picture: ${response.statusText}`
-            );
-          }
+          await deleteProfilePicture();
 
           // Update local state to reflect removal
           setUser({
@@ -168,31 +153,7 @@ const ProfilePage = () => {
       const formData = new FormData();
       formData.append("profilePicture", selectedPictureFile);
 
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("No authentication token found");
-      }
-
-      const response = await fetch(
-        "http://localhost:4000/api/profile/upload-picture",
-        {
-          method: "POST",
-          body: formData,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            // Don't set Content-Type - let the browser set it with boundary
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || "Failed to upload profile picture"
-        );
-      }
-
-      return await response.json();
+      return await uploadProfilePicture(formData);
     } catch (error) {
       console.error("Upload error:", error);
       throw error;
@@ -221,27 +182,7 @@ const ProfilePage = () => {
         profilePicture: updatedProfilePicture.profilePicture,
       };
 
-      const token = localStorage.getItem("token"); // Retrieve token from localStorage
-      if (!token) {
-        console.error("No token found in localStorage");
-        return;
-      }
-
-      // Make the API call to update the profile
-      const response = await fetch("http://localhost:4000/api/profile", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // Include token for authentication
-        },
-        body: JSON.stringify(profileData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to save profile: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      const result = await saveUserProfile(profileData);
 
       // Update local state with the saved data
       console.log(result.userProfile);
@@ -269,43 +210,30 @@ const ProfilePage = () => {
   };
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const loadProfile = async () => {
       try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          console.error("No token found in localStorage");
-          return;
-        }
-        const response = await fetch("http://localhost:4000/api/profile", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.userProfile) {
-            setUser({
-              ...data.userProfile,
-              profilePicture: data.userProfile.profilePicture || {
-                url: null,
-                publicId: null,
-              },
-            });
-            setEditedUser({
-              ...data.userProfile,
-              profilePicture: data.userProfile.profilePicture || {
-                url: null,
-                publicId: null,
-              },
-            });
-          }
+        const profile = await fetchUserProfile();
+        if (profile) {
+          setUser({
+            ...profile,
+            profilePicture: profile.profilePicture || {
+              url: null,
+              publicId: null,
+            },
+          });
+          setEditedUser({
+            ...profile,
+            profilePicture: profile.profilePicture || {
+              url: null,
+              publicId: null,
+            },
+          });
         }
       } catch (error) {
         console.error("Error fetching profile:", error);
       }
     };
-    fetchUserProfile();
+    loadProfile();
   }, []);
 
   const getOptimizedImageUrl = (url, width = 300) => {

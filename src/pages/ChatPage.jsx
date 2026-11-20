@@ -9,8 +9,7 @@ import {
 import { motion } from "framer-motion";
 
 import GeminiAudioChatModal from "../components/audio-test2";
-import { DEFAULT_SYSTEM_INSTRUCTION } from "../constants/chatConfig";
-import { formatText, buildConversationTurns, createMessageObject } from "../utils/chatUtils";
+import { formatText, createMessageObject } from "../utils/chatUtils";
 
 import { useChatSessions }         from "../hooks/useChatSessions";
 import { useEmotionDetection }     from "../hooks/useEmotionDetection";
@@ -34,7 +33,6 @@ const ChatPage = () => {
     loading,
     createSession,
     fetchMessages,
-    saveMessage,
     messageIdRef,
   } = useChatSessions();
 
@@ -45,16 +43,14 @@ const ChatPage = () => {
     setEmotionDetectionEnabled,
     videoRef,
     canvasRef,
-  } = useEmotionDetection();
+  } = useEmotionDetection(activeSession);
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [toolsEnabled]    = useState(false);
   const [collapsed, setCollapsed]                     = useState(false);
   const [isAudioModalVisible, setIsAudioModalVisible] = useState(false);
   const [input, setInput]                             = useState("");
   const [listening, setListening]                     = useState(false);
   const [audioUrl, setAudioUrl]                       = useState("");
-  const [systemInstruction]                           = useState(DEFAULT_SYSTEM_INSTRUCTION);
 
   // ── Message helpers ───────────────────────────────────────────────────────
   // Appends to both the visible list and the audio modal history mirror
@@ -70,33 +66,25 @@ const ChatPage = () => {
     [addMessage]
   );
 
-  // ── Distress notification hook ────────────────────────────────────────────
-  // Calls the distress API and shows an antd warning when score >= 7
-  const { checkDistress } = useDistressNotification(messages);
-
-  // ── Gemini Live WebSocket hook ────────────────────────────────────────────
-  // Only connects once userProfile is loaded and a session is selected
-  const geminiReady = !profileLoading && !!activeSession && Object.keys(userProfile).length > 0;
-
+  // ── Gemini Live WebSocket hook via Gateway ───────────────────────────────
   const {
     isConnected,
     hasActiveSession,
     isTyping,
     currentResponse,
+    distressScore,
     sendTurn,
     refreshSession,
   } = useGeminiChat({
-    systemInstruction,
-    toolsEnabled,
-    userProfile,
-    messages,
     activeSession,
     addMessage,
     addSystemMessage,
-    saveMessage,
     emotionRef: emotion,
-    enabled: geminiReady,
+    enabled: Boolean(activeSession),
   });
+
+  // ── Distress notification (reactive to server distress_update events) ──────
+  useDistressNotification(distressScore);
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────
   const messagesEndRef = useRef(null);
@@ -106,10 +94,10 @@ const ChatPage = () => {
 
   // ── Refresh Gemini context when session switches ───────────────────────────
   useEffect(() => {
-    if (!geminiReady) return;
+    if (!activeSession) return;
     const t = setTimeout(refreshSession, 500);
     return () => clearTimeout(t);
-  }, [activeSession, geminiReady, refreshSession]);
+  }, [activeSession, refreshSession]);
 
   // ── Send message ──────────────────────────────────────────────────────────
   const handleSendMessage = async () => {
@@ -121,10 +109,8 @@ const ChatPage = () => {
       return;
     }
 
-    const turns = buildConversationTurns(messages, text);
-    sendTurn(turns, emotion.current);
+    sendTurn(text, emotion.current);
     addMessage("user", text);
-    checkDistress(text); // async, non-blocking
     setInput("");
   };
 

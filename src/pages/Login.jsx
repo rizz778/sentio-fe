@@ -1,71 +1,44 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Form, Input, Button, Row, Col, Typography, Divider, Checkbox, message } from 'antd';
 import { MailOutlined, LockOutlined, GoogleOutlined, FacebookFilled } from '@ant-design/icons';
-import { Link, useNavigate,useLocation } from 'react-router-dom';
-import axios from 'axios';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { useAuth } from '../hooks/useAuth';
 import './Login.css';
 
 const { Title, Text } = Typography;
 
 const Login = () => {
-  const [loading, setLoading] = useState(false);
+  const { signInWithEmail, signInWithGoogle, loading } = useAuth();
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const location = useLocation();
   // Get client ID from environment variables
   const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-
   const handleSubmit = async (values) => {
     const { email, password } = values;
-    setLoading(true);
     try {
-      const response = await axios.post('http://localhost:4000/api/auth/login', {
-        email, password
-      });
-
-      const { token, user } = response.data;
-      
-      // Store token and user details in localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-
+      await signInWithEmail(email, password);
       message.success('Login successful!');
       const redirectPath = location.state?.from?.pathname || "/chat";
       navigate(redirectPath);
     } catch (error) {
       console.error('Login error:', error);
-      message.error(error.response?.data?.message || 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
+      message.error(error.message || 'Login failed. Please try again.');
     }
   };
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      setLoading(true);
       const { credential } = credentialResponse;
-  
-      // Send the credential token to your backend
-      const response = await axios.post('http://localhost:4000/api/auth/google/callback', {
-        token: credential, // Send the credential token
-      });
-  
-      const { token, user } = response.data;
-  
-      // Store token and user details in localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-  
+      await signInWithGoogle(credential);
       message.success('Google login successful!');
       const redirectPath = location.state?.from?.pathname || "/chat";
       navigate(redirectPath);
     } catch (error) {
       console.error('Google login error:', error);
-      message.error(error.response?.data?.message || 'Google login failed. Please try again.');
-    } finally {
-      setLoading(false);
+      message.error(error.message || 'Google login failed. Please try again.');
     }
   };
 

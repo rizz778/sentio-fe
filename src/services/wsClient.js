@@ -1,35 +1,54 @@
+/**
+ * wsClient.js — Gateway WebSocket Client
+ * ========================================
+ * Provides unified WebSocket connectivity to Sentio API Gateway (/ws/live).
+ */
 
+import { WS_GATEWAY_URL, API_ENDPOINTS } from "../config/api";
 
-// ── WebSocket URL constants ───────────────────────────────────────────────────
-export const GEMINI_WS_TEXT_URL =
-  import.meta.env.VITE_GEMINI_WS_TEXT_URL || "ws://localhost:8000/text";
+/**
+ * Builds the full WebSocket URL for Sentio API Gateway /ws/live.
+ *
+ * @param {object} opts
+ * @param {string} opts.sessionId
+ * @param {string|string[]} [opts.modalities] - 'TEXT', 'AUDIO', or ['TEXT', 'AUDIO']
+ * @param {string} [opts.token] - Optional Google auth token
+ * @returns {string} ws://localhost:4000/ws/live?...
+ */
+export const getLiveWsUrl = ({ sessionId, modalities = "TEXT", token } = {}) => {
+  const mods = Array.isArray(modalities) ? modalities.join(",") : modalities;
+  const t = token || localStorage.getItem("token") || "";
+  const params = new URLSearchParams();
+  if (sessionId) params.append("sessionId", sessionId);
+  if (mods) params.append("modalities", mods);
+  if (t) params.append("token", t);
+  return `${WS_GATEWAY_URL}${API_ENDPOINTS.WS_LIVE}?${params.toString()}`;
+};
 
-export const GEMINI_WS_FRAME_URL =
-  import.meta.env.VITE_GEMINI_WS_FRAME_URL || "ws://localhost:8000/frame";
+export const GEMINI_WS_TEXT_URL = `${WS_GATEWAY_URL}${API_ENDPOINTS.WS_LIVE}?modalities=TEXT`;
+export const GEMINI_WS_FRAME_URL = `${WS_GATEWAY_URL}${API_ENDPOINTS.WS_LIVE}?modalities=TEXT`;
+export const GEMINI_WS_AUDIO_URL = `${WS_GATEWAY_URL}${API_ENDPOINTS.WS_LIVE}?modalities=AUDIO`;
 
-// ── WSClient class ────────────────────────────────────────────────────────────
 export class WSClient {
-  /**
-   * @param {string} url        - Full WebSocket endpoint (ws:// or wss://)
-   * @param {object} callbacks
-   * @param {Function} [callbacks.onOpen]    - Called when the connection opens
-   * @param {Function} [callbacks.onMessage] - Called with the parsed JSON payload
-   * @param {Function} [callbacks.onClose]   - Called when the socket closes
-   * @param {Function} [callbacks.onError]   - Called on socket error
-   */
   constructor(url, { onOpen, onMessage, onClose, onError } = {}) {
     this._ws = new WebSocket(url);
+    this._ws.binaryType = "arraybuffer";
 
     this._ws.onopen = () => {
       onOpen?.();
     };
 
     this._ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        onMessage?.(data);
-      } catch (err) {
-        console.error("[WSClient] Failed to parse message:", err);
+      if (typeof event.data === "string") {
+        try {
+          const data = JSON.parse(event.data);
+          onMessage?.(data);
+        } catch (err) {
+          console.error("[WSClient] Failed to parse message:", err, event.data);
+        }
+      } else {
+        // Binary payload (e.g. PCM audio chunk from gateway)
+        onMessage?.(event.data);
       }
     };
 
@@ -43,35 +62,35 @@ export class WSClient {
     };
   }
 
-  /** Current readyState of the underlying socket */
   get readyState() {
     return this._ws.readyState;
   }
 
-  /** True when the socket is fully open and ready to send */
   get isOpen() {
     return this._ws.readyState === WebSocket.OPEN;
   }
 
-  /**
-   * Serialise payload as JSON and send it.
-   * Silently drops the call if the socket is not open.
-   * @param {object} payload
-   */
   send(payload) {
-    if (this.isOpen) {
+    if (!this.isOpen) return;
+
+    if (
+      payload instanceof ArrayBuffer ||
+      payload instanceof Uint8Array ||
+      payload instanceof Blob
+    ) {
+      this._ws.send(payload);
+    } else if (typeof payload === "string") {
+      this._ws.send(payload);
+    } else {
       this._ws.send(JSON.stringify(payload));
     }
   }
 
-  /** Close the socket cleanly */
   close() {
-    this._ws.close();
+    try {
+      this._ws.close();
+    } catch (_) {}
   }
 }
 
-/**
- * Convenience factory — returns a WSClient instance.
- * Equivalent to `new WSClient(url, callbacks)`.
- */
 export const createWsClient = (url, callbacks) => new WSClient(url, callbacks);

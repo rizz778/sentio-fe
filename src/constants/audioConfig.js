@@ -5,9 +5,12 @@
  * in one place so they are easy to tune without hunting through component code.
  */
 
-// WebSocket endpoint for the Gemini audio bridge
+import { WS_GATEWAY_URL } from "../config/api";
+
+// WebSocket endpoint for the Sentio live audio bridge via Gateway
 export const GEMINI_WS_AUDIO_URL =
-  import.meta.env.VITE_GEMINI_WS_AUDIO_URL || "ws://localhost:8000/audio";
+  import.meta.env.VITE_GEMINI_WS_AUDIO_URL ||
+  `${WS_GATEWAY_URL}/ws/live?modalities=AUDIO`;
 
 // Gemini model used for native audio (voice) sessions
 export const GEMINI_AUDIO_MODEL =

@@ -124,7 +124,7 @@ export const useAudioRecorder = (addLog) => {
       "user-input"
     );
 
-    return { base64Data, emotion };
+    return { base64Data, pcmData: pcm16.buffer, emotion };
   }, [addLog]);
 
   // ── Cleanup ───────────────────────────────────────────────────────────────

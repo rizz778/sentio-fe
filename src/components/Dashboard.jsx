@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'; 
+import { getDashboardAnalytics } from '../services/dashboardApi'; 
 
 import {
   ResponsiveContainer,
@@ -100,18 +101,7 @@ import {
       const fetchData = async () => {
         try {
           setLoading(true);
-          // Use the actual API endpoint
-          const response = await fetch(`https://emot-chtabot-1.onrender.com/api/profile/user`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}` // Assuming token-based auth
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Error: ${response.status}`);
-          }
-          
-          const result = await response.json();
+          const result = await getDashboardAnalytics();
           
           if (result.success) {
             setData(result.data);

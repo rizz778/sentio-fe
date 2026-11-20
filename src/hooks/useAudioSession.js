@@ -1,163 +1,149 @@
 /**
- * useAudioSession.js — Hook: Gemini Audio WebSocket session
- * ===========================================================
- * Orchestrates the full audio call lifecycle:
- *   1. Validates userProfile + conversationHistory before connecting
- *   2. Opens a WebSocket to the Gemini audio bridge
- *   3. Dispatches incoming frames (audio, transcription, turnComplete, error)
- *   4. On turnComplete: runs distress analysis and saves both transcripts
+ * useAudioSession.js — Hook: Gemini Audio Session via Sentio API Gateway
+ * =======================================================================
+ * Orchestrates real-time bi-directional audio calling with Gemini Live via Gateway:
+ *   1. Connects to Gateway /ws/live?sessionId=...&modalities=AUDIO
+ *   2. Receives audio_chunk frames (24kHz PCM) and queues them for playback
+ *   3. Receives live transcripts for both USER and MODEL
+ *   4. Receives stop_playback for barge-in interruptions
+ *   5. Receives distress_update computed automatically by the backend
+ *   6. Streams user microphone audio (16kHz PCM binary) to Gateway
  *
- * Depends on:
- *   useAudioPlayer    – plays incoming audio chunks
- *   useAudioRecorder  – captures mic and sends PCM to the backend
- *   useEmotionDetection (passed in as emotionState) – live emotion label
- *   useAudioLogger    – addLog
- *
- * @param {object} opts
- * @param {object}   opts.userProfile
- * @param {object[]} opts.conversationHistory
- * @param {string}   opts.sessionId
- * @param {object}   opts.emotionState   - { current, aggregated } from useEmotionDetection
- * @param {boolean}  opts.emotionEnabled - Whether emotion detection is active
- * @param {boolean}  opts.isMuted        - Whether audio output is muted
- * @param {Function} opts.addLog
- * @param {Function} opts.queueAudio
- * @param {Function} opts.processAudioQueue
- * @param {Function} opts.clearAudioQueue
- * @param {Function} opts.analyzeDistress - (text) => Promise<number>
+ * Note: Voice name, model, user profile context, and conversation history are
+ * managed server-side. Messages are saved automatically by the backend.
  */
 
 import { useState, useRef, useCallback } from "react";
-import { createWsClient } from "../services/wsClient";
-import { buildAudioSetupFrame, saveAudioMessage, GEMINI_WS_AUDIO_URL } from "../services/audioSessionApi";
+import { createWsClient, getLiveWsUrl } from "../services/wsClient";
 
 export const useAudioSession = ({
-  userProfile,
-  conversationHistory,
   sessionId,
   emotionState,
-  emotionEnabled,
   isMuted,
   addLog,
   queueAudio,
   processAudioQueue,
   clearAudioQueue,
-  analyzeDistress,
 }) => {
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
-  const [isConnected, setIsConnected]           = useState(false);
-  const [isCalling, setIsCalling]               = useState(false);
-  const [log, setLog]                           = useState("");
+  const [isConnected, setIsConnected] = useState(false);
+  const [isCalling, setIsCalling] = useState(false);
+  const [log, setLog] = useState("");
+  const [distressScore, setDistressScore] = useState(null);
 
-  // Transcript accumulators (refs — no re-render per token)
-  const inputTranscriptRef  = useRef("");
+  const inputTranscriptRef = useRef("");
   const outputTranscriptRef = useRef("");
-  const [inputTranscript, setInputTranscript]   = useState("");
+  const [inputTranscript, setInputTranscript] = useState("");
   const [outputTranscript, setOutputTranscript] = useState("");
 
   const wsRef = useRef(null);
 
   // ── Incoming frame dispatcher ─────────────────────────────────────────────
+  const handleFrame = useCallback(
+    async (data) => {
+      if (!data) return;
 
-  const handleFrame = useCallback(async (data) => {
-    switch (data.type) {
-      case "setup_complete":
-        setLog("Audio session ready. You can now talk!");
-        addLog?.("Setup complete", "success");
-        break;
-
-      case "audio":
-        // Queue audio chunk for gapless playback; pass isMuted as ref snapshot
-        if (data.audio_data) {
-          queueAudio(data.audio_data, data.mime_type || "audio/pcm", data.emotion, isMuted);
+      // Handle raw binary payload
+      if (data instanceof ArrayBuffer) {
+        const uint8 = new Uint8Array(data);
+        let binary = "";
+        for (let i = 0; i < uint8.length; i++) {
+          binary += String.fromCharCode(uint8[i]);
         }
-        break;
+        const b64 = btoa(binary);
+        queueAudio(b64, "audio/pcm;rate=24000", null, isMuted);
+        return;
+      }
 
-      case "input_transcription":
-        // Accumulate word-by-word transcription of the user's voice
-        inputTranscriptRef.current += data.text || "";
-        break;
+      switch (data.type) {
+        case "session_ready":
+          setLog("Audio session ready. You can speak now!");
+          addLog?.("Session ready — voice active", "success");
+          break;
 
-      case "output_transcription":
-        // Accumulate word-by-word transcription of the AI's voice
-        outputTranscriptRef.current += data.text || "";
-        break;
+        case "audio_chunk":
+        case "audio":
+          if (data.data || data.audio_data) {
+            queueAudio(
+              data.data || data.audio_data,
+              data.mimeType || data.mime_type || "audio/pcm;rate=24000",
+              data.emotion || emotionState?.aggregated,
+              isMuted
+            );
+          }
+          break;
 
-      case "turnComplete":
-        // Both sides have finished speaking — flush transcripts and persist
-        processAudioQueue?.();
-        const emotion = emotionEnabled ? emotionState?.aggregated || "" : "";
+        case "transcript":
+          if (data.speaker === "USER") {
+            inputTranscriptRef.current = data.text || "";
+            setInputTranscript(data.text || "");
+          } else if (data.speaker === "MODEL") {
+            outputTranscriptRef.current = data.text || "";
+            setOutputTranscript(data.text || "");
+          }
+          break;
 
-        if (inputTranscriptRef.current) {
+        case "input_transcription":
+          inputTranscriptRef.current += data.text || "";
           setInputTranscript(inputTranscriptRef.current);
-          const score = await analyzeDistress?.(inputTranscriptRef.current) ?? 0;
-          addLog?.(`Distress score: ${score}`, "info");
+          break;
 
-          const userMsg = {
-            sender: "user", type: "user",
-            text:   inputTranscriptRef.current,
-            emotion,
-            distressScore: score,
-            timestamp: new Date().toISOString(),
-          };
-          await saveAudioMessage(sessionId, userMsg);
-          if (Array.isArray(conversationHistory)) conversationHistory.push(userMsg);
-          addLog?.("User message saved", "success");
-          inputTranscriptRef.current = "";
-        }
-
-        if (outputTranscriptRef.current) {
+        case "output_transcription":
+          outputTranscriptRef.current += data.text || "";
           setOutputTranscript(outputTranscriptRef.current);
-          const botMsg = {
-            sender: "bot", type: "model",
-            text: outputTranscriptRef.current,
-            timestamp: new Date().toISOString(),
-          };
-          await saveAudioMessage(sessionId, botMsg);
-          if (Array.isArray(conversationHistory)) conversationHistory.push(botMsg);
-          addLog?.("Model message saved", "success");
-          outputTranscriptRef.current = "";
-        }
+          break;
 
-        addLog?.("Turn completed", "success");
-        break;
+        case "stop_playback":
+          // User barge-in: stop playing queued AI audio immediately
+          clearAudioQueue?.();
+          addLog?.("Playback stopped (barge-in)", "info");
+          break;
 
-      case "error":
-        addLog?.(`Error: ${data.message}`, "error");
-        break;
+        case "distress_update":
+          if (typeof data.score === "number") {
+            setDistressScore(data.score);
+            addLog?.(`Distress score update: ${data.score}`, "info");
+          }
+          break;
 
-      default:
-        break;
-    }
-  }, [
-    addLog, queueAudio, processAudioQueue, analyzeDistress,
-    emotionState, emotionEnabled, isMuted, sessionId, conversationHistory,
-  ]);
+        case "turnComplete":
+          processAudioQueue?.();
+          addLog?.("Turn completed", "success");
+          break;
+
+        case "error":
+          addLog?.(`Error: ${data.message}`, "error");
+          setLog(`Error: ${data.message}`);
+          break;
+
+        default:
+          break;
+      }
+    },
+    [addLog, queueAudio, processAudioQueue, clearAudioQueue, emotionState, isMuted]
+  );
 
   // ── Connect ───────────────────────────────────────────────────────────────
-
   const connect = useCallback(async () => {
-    if (!userProfile || Object.keys(userProfile).length === 0) {
-      setLog("User profile missing — cannot start audio call.");
-      setConnectionStatus("error");
-      return;
-    }
-    if (!conversationHistory) {
-      setLog("Conversation history missing — cannot start audio call.");
+    if (!sessionId) {
+      setLog("No active session ID — cannot start audio call.");
       setConnectionStatus("error");
       return;
     }
 
     setIsCalling(true);
-    setLog("");
+    setLog("Connecting to voice bridge...");
     setConnectionStatus("connecting");
 
-    wsRef.current = createWsClient(GEMINI_WS_AUDIO_URL, {
+    const wsUrl = getLiveWsUrl({ sessionId, modalities: ["AUDIO"] });
+
+    wsRef.current = createWsClient(wsUrl, {
       onOpen: () => {
         setConnectionStatus("connected");
         setIsConnected(true);
-        setLog("Connected — sending setup…");
-        wsRef.current.send(buildAudioSetupFrame(userProfile, conversationHistory));
+        setLog("Connected. Voice bridge active.");
+        addLog?.("WebSocket connected to Gateway /ws/live", "success");
+        wsRef.current?.send({ type: "ping" });
       },
       onMessage: handleFrame,
       onClose: (event) => {
@@ -168,32 +154,40 @@ export const useAudioSession = ({
       },
       onError: () => {
         setConnectionStatus("error");
-        addLog?.("WebSocket error", "error");
+        addLog?.("WebSocket connection error", "error");
       },
     });
-  }, [userProfile, conversationHistory, handleFrame, addLog, clearAudioQueue]);
+  }, [sessionId, handleFrame, addLog, clearAudioQueue]);
 
   // ── Send audio ────────────────────────────────────────────────────────────
-
   /**
-   * Send a captured PCM chunk to the Gemini backend.
-   * @param {string} base64Data - Base64-encoded 16-bit PCM
-   * @param {string} emotion    - Emotion label at time of recording
+   * Send captured PCM audio to Gateway.
+   * Supports raw binary (Uint8Array/ArrayBuffer) or base64 data.
    */
-  const sendAudio = useCallback((base64Data, emotion) => {
-    wsRef.current?.send({
-      type:           "audio_input",
-      audio_data:     base64Data,
-      emotion,
-      format:         "pcm",
-      sample_rate:    16000,
-      channels:       1,
-      bits_per_sample: 16,
-    });
+  const sendAudio = useCallback((pcmData, emotion) => {
+    if (!wsRef.current?.isOpen) return;
+
+    if (pcmData instanceof ArrayBuffer || pcmData instanceof Uint8Array) {
+      wsRef.current.send(pcmData);
+    } else if (typeof pcmData === "string") {
+      try {
+        const binaryString = atob(pcmData);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        wsRef.current.send(bytes.buffer);
+      } catch (_) {
+        wsRef.current.send({
+          type: "audio",
+          data: pcmData,
+          emotion: emotion || "",
+        });
+      }
+    }
   }, []);
 
   // ── Disconnect ────────────────────────────────────────────────────────────
-
   const disconnect = useCallback(() => {
     wsRef.current?.close();
     wsRef.current = null;
@@ -202,8 +196,7 @@ export const useAudioSession = ({
     setConnectionStatus("disconnected");
   }, []);
 
-  // ── Reset state (on modal reopen) ─────────────────────────────────────────
-
+  // ── Reset ─────────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
     setIsCalling(false);
     setIsConnected(false);
@@ -211,7 +204,7 @@ export const useAudioSession = ({
     setLog("");
     setInputTranscript("");
     setOutputTranscript("");
-    inputTranscriptRef.current  = "";
+    inputTranscriptRef.current = "";
     outputTranscriptRef.current = "";
   }, []);
 
@@ -222,6 +215,7 @@ export const useAudioSession = ({
     log,
     inputTranscript,
     outputTranscript,
+    distressScore,
     connect,
     disconnect,
     sendAudio,

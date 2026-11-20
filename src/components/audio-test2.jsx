@@ -55,21 +55,10 @@ const GeminiAudioChatModal = ({
     setEmotionDetectionEnabled,
     videoRef,
     canvasRef,
-  } = useEmotionDetection();
+  } = useEmotionDetection(sessionId);
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [isMuted, setIsMuted] = useState(false);
-  const [distress, setDistress] = useState(0);
-
-  // ── Distress analysis (utility-as-hook) ───────────────────────────────────
-  // Returns the numeric score AND shows the antd notification when score >= 7
-  const { checkDistress } = useDistressNotification(conversationHistory || []);
-
-  // Wrapper that also updates local distress state for the UI badge
-  const analyzeDistress = useCallback(async (text) => {
-    await checkDistress(text);
-    return 0; // actual score is managed inside the hook
-  }, [checkDistress]);
 
   // ── Mic recorder ─────────────────────────────────────────────────────────
   const { isRecording, startRecording, stopRecording, cleanup: cleanupRecorder } =
@@ -83,23 +72,23 @@ const GeminiAudioChatModal = ({
     log,
     inputTranscript,
     outputTranscript,
+    distressScore,
     connect,
     disconnect,
     sendAudio,
     reset: resetSession,
   } = useAudioSession({
-    userProfile,
-    conversationHistory,
     sessionId,
-    emotionState:   emotion,
-    emotionEnabled: emotionDetectionEnabled,
+    emotionState: emotion,
     isMuted,
     addLog,
     queueAudio,
     processAudioQueue,
     clearAudioQueue,
-    analyzeDistress,
   });
+
+  // ── Distress notification (triggers when backend distressScore >= 7) ──────
+  useDistressNotification(distressScore);
 
   // ── Lifecycle: initialise audio context, wire user-interaction resume ─────
   useEffect(() => {
@@ -141,7 +130,7 @@ const GeminiAudioChatModal = ({
   const handleStopRecording = useCallback(async () => {
     const result = await stopRecording();
     if (result) {
-      sendAudio(result.base64Data, result.emotion);
+      sendAudio(result.pcmData || result.base64Data, result.emotion);
     }
   }, [stopRecording, sendAudio]);
 

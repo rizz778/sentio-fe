@@ -1,15 +1,8 @@
 /**
  * useChatSessions.js — Hook: Chat Session & Message Management
  * =============================================================
- * Manages the full session lifecycle:
- *  - Loads sessions on mount, selects the last-used one from localStorage
- *  - Creates new sessions
- *  - Fetches & stores messages per session
- *  - Saves individual messages to the Node backend
- *  - Loads the user's profile once on mount
- *
- * Imports from chatSessionsApi + profileApi (feature APIs),
- * NOT from the monolithic chatApi barrel.
+ * Manages the session lifecycle and loads message history through the Gateway.
+ * Note: Message saving is automated server-side by the FastAPI turn processor.
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -18,20 +11,19 @@ import {
   fetchSessions,
   createSession as createSessionApi,
   fetchSessionMessages,
-  saveSessionMessage,
 } from "../services/chatSessionsApi";
 import { fetchUserProfile as fetchUserProfileApi } from "../services/profileApi";
 
 export const useChatSessions = () => {
-  const [chatSessions, setChatSessions]           = useState([]);
-  const [activeSession, setActiveSession]         = useState(
+  const [chatSessions, setChatSessions] = useState([]);
+  const [activeSession, setActiveSession] = useState(
     () => localStorage.getItem("activeSession") || null
   );
-  const [messages, setMessages]                   = useState([]);
+  const [messages, setMessages] = useState([]);
   const [audioConversationHistory, setAudioConversationHistory] = useState([]);
-  const [userProfile, setUserProfile]             = useState({});
-  const [profileLoading, setProfileLoading]       = useState(true);
-  const [loading, setLoading]                     = useState(false);
+  const [userProfile, setUserProfile] = useState({});
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const messageIdRef = useRef(1);
 
   // ── Sessions ────────────────────────────────────────────────────────────────
@@ -42,7 +34,7 @@ export const useChatSessions = () => {
       const sessions = await fetchSessions();
       setChatSessions(sessions || []);
 
-      const saved   = localStorage.getItem("activeSession");
+      const saved = localStorage.getItem("activeSession");
       const isValid = (sessions || []).find((s) => s._id === saved);
 
       if (isValid) {
@@ -51,7 +43,6 @@ export const useChatSessions = () => {
         setActiveSession(sessions[0]._id);
         localStorage.setItem("activeSession", sessions[0]._id);
       } else {
-        // No sessions exist — create an initial one
         const newSession = await createSessionApi("Session 1");
         setChatSessions([newSession]);
         setActiveSession(newSession._id);
@@ -67,7 +58,7 @@ export const useChatSessions = () => {
   const createSession = useCallback(async () => {
     try {
       setLoading(true);
-      const name       = `Chat ${chatSessions.length + 1}`;
+      const name = `Chat ${chatSessions.length + 1}`;
       const newSession = await createSessionApi(name);
       await loadSessions();
       setActiveSession(newSession._id);
@@ -87,7 +78,7 @@ export const useChatSessions = () => {
 
   // ── Messages ─────────────────────────────────────────────────────────────────
 
-  /** Fetch and store messages for a given session (sorted + normalised by API) */
+  /** Fetch and store messages for a given session */
   const fetchMessages = useCallback(async (sessionId) => {
     if (!sessionId) return;
     try {
@@ -103,16 +94,6 @@ export const useChatSessions = () => {
       messageIdRef.current = 1;
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  /** Persist a single message to the Node backend (fire-and-forget for the UI) */
-  const saveMessage = useCallback(async (sessionId, messageData) => {
-    if (!sessionId || !messageData) return;
-    try {
-      await saveSessionMessage(sessionId, messageData);
-    } catch (err) {
-      console.error("[useChatSessions] saveMessage error:", err);
     }
   }, []);
 
@@ -133,13 +114,11 @@ export const useChatSessions = () => {
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
-  // Initial load: sessions + profile in parallel
   useEffect(() => {
     loadSessions();
     loadUserProfile();
   }, [loadSessions, loadUserProfile]);
 
-  // Whenever the active session changes, persist it and fetch its messages
   useEffect(() => {
     if (activeSession) {
       localStorage.setItem("activeSession", activeSession);
@@ -161,7 +140,6 @@ export const useChatSessions = () => {
     loadSessions,
     createSession,
     fetchMessages,
-    saveMessage,
     loadUserProfile,
     messageIdRef,
   };
