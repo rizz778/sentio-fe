@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "../hooks/useAuth";
 import {
   fetchUserProfile,
   saveUserProfile,
@@ -23,30 +24,46 @@ import {
 } from "lucide-react";
 import { Edit } from "react-feather";
 
-const ProfilePage = () => {
-  // Mock user data based on the schema
-  const [user, setUser] = useState({
-    name: "Suvir Arora",
-    age: 25,
-    gender: "Male",
-    preferredLanguage: "English",
-    currentMood: "Neutral",
-    stressFrequency: "Often",
-    diagnosedCondition: "None",
-    triggers: ["Work Pressure", "Lack of Sleep"],
-    sleepHours: 5,
-    exerciseFrequency: "Rarely",
-    hasSupportSystem: true,
-    copingMechanisms: ["Music", "Meditation"],
-    responsePreference: "Empathetic & Supportive",
-    wantsAffirmations: true,
-    wantsReminders: false,
-    profilePicture: { url: null, publicId: null },
-  });
+// Safe empty profile for new users — all array fields guaranteed to be arrays
+const EMPTY_PROFILE = {
+  name: "",
+  age: "",
+  gender: "",
+  preferredLanguage: "English",
+  currentMood: "Neutral",
+  stressFrequency: "",
+  diagnosedCondition: "None",
+  triggers: [],
+  sleepHours: "",
+  exerciseFrequency: "",
+  hasSupportSystem: false,
+  copingMechanisms: [],
+  responsePreference: "Empathetic & Supportive",
+  wantsAffirmations: false,
+  wantsReminders: false,
+  profilePicture: { url: null, publicId: null },
+};
 
-  // State for edit mode
+/** Merge backend profile, guaranteeing array fields are always arrays */
+function normaliseProfile(raw) {
+  if (!raw) return EMPTY_PROFILE;
+  return {
+    ...EMPTY_PROFILE,
+    ...raw,
+    triggers: Array.isArray(raw.triggers) ? raw.triggers : [],
+    copingMechanisms: Array.isArray(raw.copingMechanisms) ? raw.copingMechanisms : [],
+    profilePicture: raw.profilePicture || { url: null, publicId: null },
+  };
+}
+
+const ProfilePage = () => {
+  const { user: authUser } = useAuth();
+  const [user, setUser] = useState(EMPTY_PROFILE);
+  const [isNewUser, setIsNewUser] = useState(false);
+
+  // State for edit mode — new users start in edit mode automatically
   const [isEditing, setIsEditing] = useState(false);
-  const [editedUser, setEditedUser] = useState(user);
+  const [editedUser, setEditedUser] = useState(EMPTY_PROFILE);
 
   // State for loading and error feedback
   const [isSaving, setIsSaving] = useState(false);
@@ -141,10 +158,11 @@ const ProfilePage = () => {
 
   const handleNumberChange = (e) => {
     const { name, value } = e.target;
-    setEditedUser({ ...editedUser, [name]: parseInt(value, 10) });
+    const parsed = parseInt(value, 10);
+    setEditedUser({ ...editedUser, [name]: isNaN(parsed) ? "" : parsed });
   };
 
-  const uploadProfilePicture = async () => {
+  const doUploadProfilePicture = async () => {
     if (!selectedPictureFile) return null;
 
     try {
@@ -169,25 +187,41 @@ const ProfilePage = () => {
       setSaveError(null);
       setSaveSuccess(false);
 
-      // First upload the picture to Cloudinary if there's a new one
-      let updatedProfilePicture = editedUser.profilePicture;
+      // Build the payload — start from editedUser
+      const profileData = { ...editedUser };
 
-      if (selectedPictureFile) {
-        updatedProfilePicture = await uploadProfilePicture();
+      if (!profileData.name || !profileData.name.trim()) {
+        setSaveError("Please enter your name.");
+        setIsSaving(false);
+        return;
       }
-      console.log(updatedProfilePicture);
-      // Prepare the data to be sent
-      const profileData = {
-        ...editedUser,
-        profilePicture: updatedProfilePicture.profilePicture,
-      };
+      const ageNum = Number(profileData.age);
+      if (!profileData.age || isNaN(ageNum) || ageNum <= 0) {
+        setSaveError("Please enter a valid age.");
+        setIsSaving(false);
+        return;
+      }
+      profileData.age = ageNum;
+      if (profileData.sleepHours) {
+        profileData.sleepHours = Number(profileData.sleepHours) || 7;
+      }
+
+      // If a new picture was selected, upload it first and fold the result in
+      if (selectedPictureFile) {
+        const uploadResult = await doUploadProfilePicture();
+        if (uploadResult?.profilePicture) {
+          profileData.profilePicture = uploadResult.profilePicture;
+        }
+      }
 
       const result = await saveUserProfile(profileData);
 
-      // Update local state with the saved data
-      console.log(result.userProfile);
-      setUser(result.userProfile);
+      // Update local state with the saved data, normalising arrays defensively
+      const saved = normaliseProfile(result?.userProfile || profileData);
+      setUser(saved);
+      setEditedUser(saved);
       setIsEditing(false);
+      setIsNewUser(false);
       setSelectedPictureFile(null);
       setSaveSuccess(true);
 
@@ -214,20 +248,23 @@ const ProfilePage = () => {
       try {
         const profile = await fetchUserProfile();
         if (profile) {
-          setUser({
-            ...profile,
-            profilePicture: profile.profilePicture || {
-              url: null,
-              publicId: null,
-            },
-          });
-          setEditedUser({
-            ...profile,
-            profilePicture: profile.profilePicture || {
-              url: null,
-              publicId: null,
-            },
-          });
+          // Existing user — normalise and display
+          const normalised = normaliseProfile(profile);
+          setUser(normalised);
+          setEditedUser(normalised);
+          setIsNewUser(false);
+        } else {
+          // New user (404 / no profile saved yet) — open edit mode immediately
+          const initialNewProfile = {
+            ...EMPTY_PROFILE,
+            name: authUser?.name || "",
+            age: 25,
+            sleepHours: 7,
+          };
+          setUser(initialNewProfile);
+          setEditedUser(initialNewProfile);
+          setIsNewUser(true);
+          setIsEditing(true);
         }
       } catch (error) {
         console.error("Error fetching profile:", error);
@@ -278,6 +315,13 @@ const ProfilePage = () => {
         </div>
 
         {/* Status messages */}
+        {isNewUser && (
+          <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-4">
+            <p className="font-semibold">Welcome to Sentio! 👋</p>
+            <p className="text-sm">Please fill in your profile so we can personalise your experience.</p>
+          </div>
+        )}
+
         {saveError && (
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
             <p className="font-medium">Error</p>
@@ -555,7 +599,7 @@ const ProfilePage = () => {
                     </label>
                     <input
                       type="text"
-                      value={editedUser.triggers.join(", ")}
+                      value={(editedUser.triggers || []).join(", ")}
                       onChange={(e) =>
                         handleArrayInputChange("triggers", e.target.value)
                       }
@@ -570,7 +614,7 @@ const ProfilePage = () => {
                     </label>
                     <input
                       type="text"
-                      value={editedUser.copingMechanisms.join(", ")}
+                      value={(editedUser.copingMechanisms || []).join(", ")}
                       onChange={(e) =>
                         handleArrayInputChange(
                           "copingMechanisms",
@@ -792,7 +836,7 @@ const ProfilePage = () => {
                       <div>
                         <p className="text-sm text-gray-500">Triggers</p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {user.triggers.map((trigger, index) => (
+                          {(user.triggers || []).map((trigger, index) => (
                             <span
                               key={index}
                               className="px-2 py-1 bg-pink-50 text-pink-600 rounded-full text-xs"
@@ -808,7 +852,7 @@ const ProfilePage = () => {
                           Coping Mechanisms
                         </p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {user.copingMechanisms.map((mechanism, index) => (
+                          {(user.copingMechanisms || []).map((mechanism, index) => (
                             <span
                               key={index}
                               className="px-2 py-1 bg-purple-50 text-purple-600 rounded-full text-xs"

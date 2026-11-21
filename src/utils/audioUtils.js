@@ -62,7 +62,7 @@ export const decodeAudioChunk = async (audioData, mimeType, audioCtx, sampleRate
     if (isPCMFormat(mimeType)) {
       // Validate byte alignment (Int16 = 2 bytes per sample)
       if (uint8.length % 2 !== 0) return null;
-      const int16 = new Int16Array(uint8.buffer);
+      const int16 = new Int16Array(uint8.buffer, uint8.byteOffset, uint8.length / 2);
       const buffer = audioCtx.createBuffer(1, int16.length, sampleRate);
       const channel = buffer.getChannelData(0);
       for (let i = 0; i < int16.length; i++) {

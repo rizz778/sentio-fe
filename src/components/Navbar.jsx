@@ -1,13 +1,12 @@
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import logo6 from '../assets/images/logo6.jpg';
 import { fetchUserProfile } from "../services/profileApi";
-import { logout } from "../utils/auth";
+import { useAuth } from "../hooks/useAuth";
 
 const Navbar = () => {
-  const location = useLocation();
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem("token"));
+  const { isAuthenticated, signOut } = useAuth();
   const [userProfile, setUserProfile] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -41,16 +40,11 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = () => {
-    logout();
-    setIsAuthenticated(false);
+    signOut();
     setUserProfile(null);
     setDropdownOpen(false);
     navigate("/");
   };
-
-  useEffect(() => {
-    setIsAuthenticated(!!localStorage.getItem("token"));
-  }, [location.pathname]);
 
   const getOptimizedImageUrl = (url, width = 300) => {
     if (!url) return null;

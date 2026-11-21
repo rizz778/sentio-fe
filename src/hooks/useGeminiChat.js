@@ -28,6 +28,7 @@ export const useGeminiChat = ({
   const [distressScore, setDistressScore] = useState(null);
 
   const currentResponseRef = useRef("");
+  const typingWatchdogRef  = useRef(null);
 
   // Memoized Gateway WebSocket URL
   const wsUrl = useMemo(() => {
@@ -54,7 +55,20 @@ export const useGeminiChat = ({
             setIsTyping(true);
             currentResponseRef.current = data.text;
             setCurrentResponse(data.text);
+
+            // Inactivity watchdog: if no further chunks arrive for 2.5s, auto-finalize turn
+            if (typingWatchdogRef.current) clearTimeout(typingWatchdogRef.current);
+            typingWatchdogRef.current = setTimeout(() => {
+              setIsTyping(false);
+              const fallbackText = currentResponseRef.current || "";
+              if (fallbackText.trim()) {
+                addMessage("model", fallbackText);
+              }
+              setCurrentResponse("");
+              currentResponseRef.current = "";
+            }, 2500);
           } else {
+            if (typingWatchdogRef.current) clearTimeout(typingWatchdogRef.current);
             setIsTyping(false);
             const finalText = data.text || currentResponseRef.current || "";
             if (finalText.trim()) {
@@ -69,7 +83,7 @@ export const useGeminiChat = ({
 
       // ── Gateway distress score update (computed server-side) ────────────
       if (data.type === "distress_update") {
-        if (typeof data.score === "number") {
+        if (typeof data.score === "number" && data.score > 0) {
           setDistressScore(data.score);
         }
         return;
@@ -141,6 +155,7 @@ export const useGeminiChat = ({
     },
     onMessage: handleMessage,
     onClose: () => {
+      if (typingWatchdogRef.current) clearTimeout(typingWatchdogRef.current);
       setHasActiveSession(false);
       setIsTyping(false);
       setCurrentResponse("");

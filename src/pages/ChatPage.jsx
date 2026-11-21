@@ -171,7 +171,7 @@ const ChatPage = () => {
 
           <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
             {/* New Chat */}
-            <Button type="primary" icon={<PlusOutlined />} onClick={createSession}
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => createSession()}
               style={{ backgroundColor: "#ff4caf", borderColor: "#d9363e", color: "white", fontWeight: "bold", borderRadius: "8px", height: "40px" }}>
               {!collapsed && <span>New Chat</span>}
             </Button>
@@ -235,13 +235,19 @@ const ChatPage = () => {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   style={{ padding: "12px 16px", backgroundColor: "#fff", borderRadius: "12px", marginBottom: "10px", border: "1px solid #ffe4ed", maxWidth: "80%" }}>
                   <strong style={{ color: "#e83e8c" }}>Sentio AI:</strong>{" "}
-                  {currentResponse || "Thinking..."}
-                  <Spin size="small" style={{ marginLeft: "10px" }} />
+                  {currentResponse ? (
+                    <span dangerouslySetInnerHTML={{ __html: formatText(currentResponse) }} />
+                  ) : (
+                    <>
+                      <span style={{ color: "#8c8c8c" }}>Thinking...</span>
+                      <Spin size="small" style={{ marginLeft: "10px" }} />
+                    </>
+                  )}
                 </motion.div>
               )}
 
-              {/* Full-screen spinner while messages are loading from backend */}
-              {loading && (
+              {/* Spinner while messages are loading from backend for an empty chat */}
+              {loading && messages.length === 0 && (
                 <div style={{ display: "flex", justifyContent: "center", padding: "20px" }}>
                   <Spin size="default" />
                 </div>

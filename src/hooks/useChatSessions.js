@@ -58,9 +58,12 @@ export const useChatSessions = () => {
   const createSession = useCallback(async (customName) => {
     try {
       setLoading(true);
+      // Use functional updater to get current length without stale closure
+      let sessionCount = 0;
+      setChatSessions((prev) => { sessionCount = prev?.length || 0; return prev; });
       const name = typeof customName === "string" && customName.trim()
         ? customName.trim()
-        : `Chat ${(chatSessions?.length || 0) + 1}`;
+        : `Chat ${sessionCount + 1}`;
       const newSession = await createSessionApi(name);
       const newId = (newSession._id || newSession.sessionId)?.toString();
 
@@ -82,7 +85,7 @@ export const useChatSessions = () => {
     } finally {
       setLoading(false);
     }
-  }, [chatSessions]);
+  }, []);
 
   // ── Messages ─────────────────────────────────────────────────────────────────
 

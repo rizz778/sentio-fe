@@ -187,6 +187,18 @@ export const useAudioSession = ({
     }
   }, []);
 
+  // ── Interrupt (Barge-in) ─────────────────────────────────────────────────
+  const interrupt = useCallback(() => {
+    if (wsRef.current?.isOpen) {
+      wsRef.current.send({ type: "interrupt", reason: "user_barge_in" });
+    }
+    clearAudioQueue?.();
+    setInputTranscript("");
+    setOutputTranscript("");
+    inputTranscriptRef.current = "";
+    outputTranscriptRef.current = "";
+  }, [clearAudioQueue]);
+
   // ── Disconnect ────────────────────────────────────────────────────────────
   const disconnect = useCallback(() => {
     wsRef.current?.close();
@@ -219,6 +231,7 @@ export const useAudioSession = ({
     connect,
     disconnect,
     sendAudio,
+    interrupt,
     reset,
     wsRef,
   };

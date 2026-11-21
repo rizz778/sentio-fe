@@ -27,6 +27,7 @@ export const useAudioPlayer = (addLog) => {
   const masterGainRef        = useRef(null);
   const audioBufferRef       = useRef([]);       // Pending chunk queue
   const isPlayingRef         = useRef(false);
+  const isDrainingRef        = useRef(false);    // Guard: only one drain loop at a time
   const scheduledSourcesRef  = useRef([]);       // Currently scheduled AudioBufferSourceNodes
   const playbackStartTimeRef = useRef(0);        // End time of last scheduled chunk
   const lastEmotionRef       = useRef("");
@@ -74,8 +75,11 @@ export const useAudioPlayer = (addLog) => {
   // ── Drain the chunk queue using scheduled playback times ─────────────────
 
   const processAudioQueue = useCallback(async () => {
+    // Prevent concurrent drain loops — only one processAudioQueue runs at a time
+    if (isDrainingRef.current) return;
     if (!audioContextRef.current || audioBufferRef.current.length === 0) return;
 
+    isDrainingRef.current = true;
     try {
       await resumeIfSuspended();
 
@@ -116,6 +120,8 @@ export const useAudioPlayer = (addLog) => {
       }
     } catch (err) {
       addLog?.("Audio playback error: " + err.message, "error");
+    } finally {
+      isDrainingRef.current = false;
     }
   }, [addLog, resumeIfSuspended]);
 
@@ -160,6 +166,7 @@ export const useAudioPlayer = (addLog) => {
   /** Stop playback and drain the pending chunk queue */
   const clearAudioQueue = useCallback(() => {
     audioBufferRef.current = [];
+    isDrainingRef.current = false;   // Allow a fresh drain after clearing
     stopCurrentAudio();
     setAudioQueueLength(0);
     addLog?.("Audio queue cleared", "info");

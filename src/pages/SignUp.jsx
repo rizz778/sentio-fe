@@ -8,10 +8,18 @@ import './SignUp.css';
 const { Title, Text, Paragraph } = Typography;
 
 const Signup = () => {
-  const { signInWithGoogle, loading } = useAuth();
+  const { signInWithGoogle, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  // If already authenticated, redirect immediately to profile or chat
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      const redirectPath = location.state?.from?.pathname || '/profile';
+      navigate(redirectPath, { replace: true });
+    }
+  }, [isAuthenticated, navigate, location.state]);
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
@@ -23,7 +31,7 @@ const Signup = () => {
       await signInWithGoogle(credential);
       message.success('Account ready! Welcome to Sentio.');
       const redirectPath = location.state?.from?.pathname || '/profile';
-      navigate(redirectPath);
+      navigate(redirectPath, { replace: true });
     } catch (error) {
       console.error('Google signup error:', error);
       message.error(error.message || 'Google authentication failed. Please try again.');

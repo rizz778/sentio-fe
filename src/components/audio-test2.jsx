@@ -76,6 +76,7 @@ const GeminiAudioChatModal = ({
     connect,
     disconnect,
     sendAudio,
+    interrupt,
     reset: resetSession,
   } = useAudioSession({
     sessionId,
@@ -124,9 +125,11 @@ const GeminiAudioChatModal = ({
   // ── Recording handlers ────────────────────────────────────────────────────
 
   const handleStartRecording = useCallback(async () => {
+    // Cut off any playing or queued previous response and signal Gemini to stop old turn
+    interrupt();
     const currentEmotion = emotionDetectionEnabled ? emotion.aggregated || "" : "";
     await startRecording(currentEmotion, handleStopRecording);
-  }, [emotionDetectionEnabled, emotion, startRecording]);
+  }, [emotionDetectionEnabled, emotion, startRecording, interrupt]);
 
   const handleStopRecording = useCallback(async () => {
     const result = await stopRecording();

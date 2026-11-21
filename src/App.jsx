@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
-import { useAuth } from "./hooks/useAuth";
+import { AuthProvider, useAuth } from "./hooks/useAuth";
 import "./App.css";
 
 // Lazy-loaded pages (Code Splitting for fast startup and lightweight memory)
@@ -40,8 +40,8 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={isAuthenticated ? <Navigate to="/chat" /> : <Login />} />
-          <Route path="/signup" element={isAuthenticated ? <Navigate to="/chat" /> : <Signup />} />
+          <Route path="/login" element={isAuthenticated ? <Navigate to="/chat" replace /> : <Login />} />
+          <Route path="/signup" element={isAuthenticated ? <Navigate to="/chat" replace /> : <Signup />} />
           <Route path="/resource" element={<Resource />} />
           <Route path="/about" element={<About2 />} />
 
@@ -70,7 +70,9 @@ function App() {
 export default function AppWrapper() {
   return (
     <Router>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </Router>
   );
 }
