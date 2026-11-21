@@ -45,7 +45,11 @@ export const useAudioPlayer = (addLog) => {
       masterGainRef.current.connect(audioContextRef.current.destination);
 
       if (audioContextRef.current.state === "suspended") {
-        await audioContextRef.current.resume();
+        try {
+          await audioContextRef.current.resume();
+        } catch (_) {
+          // Autoplay policy: will resume on first user click/keypress via resumeIfSuspended
+        }
       }
 
       audioContextReadyRef.current = true;
@@ -58,8 +62,12 @@ export const useAudioPlayer = (addLog) => {
   // ── Resume on user interaction (browser autoplay policy) ─────────────────
 
   const resumeIfSuspended = useCallback(async () => {
-    if (audioContextRef.current?.state === "suspended") {
-      await audioContextRef.current.resume();
+    if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+      try {
+        await audioContextRef.current.resume();
+      } catch (_) {
+        // Silently ignore if already closed or cannot resume
+      }
     }
   }, []);
 

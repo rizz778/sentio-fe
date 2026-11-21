@@ -9,25 +9,35 @@ import { API_ENDPOINTS } from "../config/api";
 
 /**
  * Fetch the authenticated user's profile.
+ * Returns null (instead of throwing) when the user has not set up a profile yet (404).
  *
- * @returns {Promise<object>} Normalised profile object
+ * @returns {Promise<object|null>} Normalised profile object, or null if not found
  */
 export const fetchUserProfile = async () => {
-  const res = await nodeClient.get(API_ENDPOINTS.PROFILE.BASE);
-  const raw = res.data?.userProfile || res.data || {};
+  try {
+    const res = await nodeClient.get(API_ENDPOINTS.PROFILE.BASE);
+    const raw = res.data?.userProfile || res.data || {};
 
-  return {
-    name: raw.name,
-    age: raw.age,
-    gender: raw.gender,
-    stressFrequency: raw.stressFrequency,
-    sleep: raw.sleepHours ? `${raw.sleepHours} hours/night` : undefined,
-    exercise: raw.exerciseFrequency,
-    interests: raw.interests,
-    goals: raw.goals,
-    profilePicture: raw.profilePicture || { url: null, publicId: null },
-    ...raw,
-  };
+    return {
+      name: raw.name,
+      age: raw.age,
+      gender: raw.gender,
+      stressFrequency: raw.stressFrequency,
+      sleep: raw.sleepHours ? `${raw.sleepHours} hours/night` : undefined,
+      exercise: raw.exerciseFrequency,
+      interests: raw.interests,
+      goals: raw.goals,
+      profilePicture: raw.profilePicture || { url: null, publicId: null },
+      ...raw,
+    };
+  } catch (err) {
+    // 404 means the user has never saved a profile yet — that's normal for new accounts.
+    // Return null so callers can render an empty/setup state without crashing.
+    if (err.message?.includes('Profile not found') || err.message?.includes('404')) {
+      return null;
+    }
+    throw err; // re-throw any real server errors
+  }
 };
 
 /**

@@ -8,9 +8,41 @@ import { useState, useCallback } from "react";
 import { loginWithGoogle, fetchCurrentUser } from "../services/authApi";
 import { getToken, getUser, logout as clearAuthStorage } from "../utils/auth";
 
+/**
+ * Decodes a Google ID token (JWT) and checks if it is expired.
+ * Google ID tokens are plain JWTs — no library needed, just base64-decode the payload.
+ * @param {string} token
+ * @returns {boolean} true if the token is expired or unreadable
+ */
+function isTokenExpired(token) {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    // `exp` is seconds since epoch; Date.now() is ms
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true; // treat unreadable token as expired
+  }
+}
+
+/**
+ * Returns stored token only if it is still valid.
+ * Clears localStorage if the stored token is already expired.
+ */
+function getValidToken() {
+  const stored = getToken();
+  if (!stored) return null;
+  if (isTokenExpired(stored)) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("activeSession");
+    return null;
+  }
+  return stored;
+}
+
 export const useAuth = () => {
-  const [token, setToken] = useState(() => getToken());
-  const [user, setUser] = useState(() => getUser());
+  const [token, setToken] = useState(() => getValidToken());
+  const [user, setUser] = useState(() => (getValidToken() ? getUser() : null));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 

@@ -13,7 +13,7 @@ const Resource = lazy(() => import("./pages/Resource.jsx"));
 const About2 = lazy(() => import("./pages/About2.jsx"));
 const Helpline = lazy(() => import("./pages/Helpline.jsx"));
 const SelfAssessment = lazy(() => import("./pages/SelfAssessment.jsx"));
-const TestPage = lazy(() => import("./components/TestPage.jsx"));
+// const TestPage = lazy(() => import("./components/TestPage.jsx"));
 const Therapists = lazy(() => import("./pages/Therapists.jsx"));
 const TherapistBookingPage = lazy(() => import("./pages/TherapistBookingPage.jsx"));
 const RelaxationToolsPage = lazy(() => import("./pages/RelaxationToolsPage.jsx"));
@@ -51,7 +51,7 @@ function App() {
           <Route path="/avatarexp" element={<Navigate to="/" replace />} />
           <Route path="/helpline" element={isAuthenticated ? <Helpline /> : <Navigate to="/login" />} />
           <Route path="/selfassessment" element={isAuthenticated ? <SelfAssessment /> : <Navigate to="/login" />} />
-          <Route path="/test/depression" element={isAuthenticated ? <TestPage /> : <Navigate to="/login" />} />
+          {/* <Route path="/test/depression" element={isAuthenticated ? <TestPage /> : <Navigate to="/login" />} /> */}
           <Route path="/therapists" element={isAuthenticated ? <Therapists /> : <Navigate to="/login" />} />
           <Route path="/therapist_booking" element={isAuthenticated ? <TherapistBookingPage /> : <Navigate to="/login" />} />
           <Route path="/relaxationtools" element={isAuthenticated ? <RelaxationToolsPage /> : <Navigate to="/login" />} />

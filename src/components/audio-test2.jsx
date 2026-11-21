@@ -114,7 +114,8 @@ const GeminiAudioChatModal = ({
     if (!visible) return;
     resetSession();
     clearLogs();
-    setDistress(0);
+    // Note: distressScore is managed entirely by the backend via WS events.
+    // No local distress state to reset here.
     initAudioContext();
     connect();
   // eslint-disable-next-line react-hooks/exhaustive-deps

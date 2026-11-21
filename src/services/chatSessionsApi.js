@@ -27,7 +27,14 @@ export const fetchSessions = async () => {
  */
 export const createSession = async (sessionName) => {
   const res = await nodeClient.post(API_ENDPOINTS.SESSIONS.BASE, { sessionName });
-  return res.data;
+  const data = res.data || {};
+  return {
+    _id: data._id || data.sessionId,
+    sessionId: data.sessionId || data._id,
+    sessionName: data.sessionName || sessionName,
+    createdAt: data.createdAt,
+    ...data,
+  };
 };
 
 /**

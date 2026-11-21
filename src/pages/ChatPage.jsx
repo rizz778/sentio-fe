@@ -164,7 +164,7 @@ const ChatPage = () => {
             onClick={({ key }) => { setActiveSession(key); fetchMessages(key); }}
             style={{ background: "transparent", border: "none" }}
             items={chatSessions.map((s) => ({
-              key: s._id, icon: <MessageOutlined />,
+              key: s._id || s.sessionId, icon: <MessageOutlined />,
               label: !collapsed ? s.sessionName : "",
             }))}
           />

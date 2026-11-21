@@ -55,14 +55,22 @@ export const useChatSessions = () => {
   }, []);
 
   /** Create a new named session, then refresh the session list */
-  const createSession = useCallback(async () => {
+  const createSession = useCallback(async (customName) => {
     try {
       setLoading(true);
-      const name = `Chat ${chatSessions.length + 1}`;
+      const name = typeof customName === "string" && customName.trim()
+        ? customName.trim()
+        : `Chat ${(chatSessions?.length || 0) + 1}`;
       const newSession = await createSessionApi(name);
-      await loadSessions();
-      setActiveSession(newSession._id);
-      localStorage.setItem("activeSession", newSession._id);
+      const newId = (newSession._id || newSession.sessionId)?.toString();
+
+      // Immediately prepend new session to sidebar list
+      setChatSessions((prev) => [newSession, ...(prev || [])]);
+
+      if (newId) {
+        setActiveSession(newId);
+        localStorage.setItem("activeSession", newId);
+      }
       setMessages([]);
       setAudioConversationHistory([]);
       messageIdRef.current = 1;
@@ -74,7 +82,7 @@ export const useChatSessions = () => {
     } finally {
       setLoading(false);
     }
-  }, [chatSessions.length, loadSessions]);
+  }, [chatSessions]);
 
   // ── Messages ─────────────────────────────────────────────────────────────────
 
