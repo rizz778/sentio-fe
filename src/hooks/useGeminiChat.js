@@ -27,8 +27,9 @@ export const useGeminiChat = ({
   const [totalTokens, setTotalTokens] = useState(0);
   const [distressScore, setDistressScore] = useState(null);
 
-  const currentResponseRef = useRef("");
-  const typingWatchdogRef  = useRef(null);
+  const currentResponseRef  = useRef("");
+  const typingWatchdogRef   = useRef(null);
+  const messageCommittedRef = useRef(false); // guard against duplicate commits per turn
 
   // Memoized Gateway WebSocket URL
   const wsUrl = useMemo(() => {
@@ -52,26 +53,41 @@ export const useGeminiChat = ({
       if (data.type === "transcript") {
         if (data.speaker === "MODEL") {
           if (!data.isFinal) {
+            // Skip empty turn-completion signals (is_final=true with empty text from servicer.py)
+            if (!data.text || !data.text.trim()) return;
+
             setIsTyping(true);
             currentResponseRef.current = data.text;
             setCurrentResponse(data.text);
+            // Reset per-turn commit guard on each new streaming chunk
+            messageCommittedRef.current = false;
 
-            // Inactivity watchdog: if no further chunks arrive for 2.5s, auto-finalize turn
+            // Inactivity watchdog: last-resort fallback if is_final never arrives (1.5s)
             if (typingWatchdogRef.current) clearTimeout(typingWatchdogRef.current);
             typingWatchdogRef.current = setTimeout(() => {
+              if (messageCommittedRef.current) return; // already committed
               setIsTyping(false);
               const fallbackText = currentResponseRef.current || "";
               if (fallbackText.trim()) {
+                messageCommittedRef.current = true;
                 addMessage("model", fallbackText);
               }
               setCurrentResponse("");
               currentResponseRef.current = "";
-            }, 2500);
+            }, 1500);
           } else {
-            if (typingWatchdogRef.current) clearTimeout(typingWatchdogRef.current);
+            // is_final — definitive end of model turn
+            if (typingWatchdogRef.current) {
+              clearTimeout(typingWatchdogRef.current);
+              typingWatchdogRef.current = null;
+            }
             setIsTyping(false);
+
+            // Only commit if the model actually streamed content for this turn (prevents stale / empty commits)
+            const hasTurnContent = Boolean(isTyping || currentResponseRef.current || (data.text && data.text.trim()));
             const finalText = data.text || currentResponseRef.current || "";
-            if (finalText.trim()) {
+            if (finalText.trim() && !messageCommittedRef.current && hasTurnContent) {
+              messageCommittedRef.current = true;
               addMessage("model", finalText);
             }
             setCurrentResponse("");
@@ -90,11 +106,20 @@ export const useGeminiChat = ({
       }
 
       // ── Gateway barge-in interruption ───────────────────────────────────
+      // If a message was streaming and not yet committed, commit it now so it is not lost
       if (data.type === "stop_playback" || data.type === "interrupted") {
+        if (typingWatchdogRef.current) {
+          clearTimeout(typingWatchdogRef.current);
+          typingWatchdogRef.current = null;
+        }
         setIsTyping(false);
+        const partialText = currentResponseRef.current || "";
+        if (partialText.trim() && !messageCommittedRef.current) {
+          messageCommittedRef.current = true;
+          addMessage("model", partialText);
+        }
         setCurrentResponse("");
         currentResponseRef.current = "";
-        addSystemMessage("Generation interrupted");
         return;
       }
 
@@ -134,8 +159,14 @@ export const useGeminiChat = ({
       }
 
       if (data.type === "generation_complete") {
+        if (typingWatchdogRef.current) {
+          clearTimeout(typingWatchdogRef.current);
+          typingWatchdogRef.current = null;
+        }
         setIsTyping(false);
-        if (currentResponseRef.current?.trim()) {
+        // Only commit if not already committed by is_final transcript
+        if (currentResponseRef.current?.trim() && !messageCommittedRef.current) {
+          messageCommittedRef.current = true;
           addMessage("model", currentResponseRef.current);
         }
         setCurrentResponse("");
@@ -182,6 +213,9 @@ export const useGeminiChat = ({
       }
 
       if (!textToSend.trim()) return;
+
+      // Reset per-turn commit guard before each new user turn
+      messageCommittedRef.current = false;
 
       send({
         type: "text",

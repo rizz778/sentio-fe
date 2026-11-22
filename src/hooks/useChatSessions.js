@@ -25,6 +25,11 @@ export const useChatSessions = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const messageIdRef = useRef(1);
+  const chatSessionsRef = useRef([]);
+
+  useEffect(() => {
+    chatSessionsRef.current = chatSessions;
+  }, [chatSessions]);
 
   // ── Sessions ────────────────────────────────────────────────────────────────
 
@@ -43,7 +48,7 @@ export const useChatSessions = () => {
         setActiveSession(sessions[0]._id);
         localStorage.setItem("activeSession", sessions[0]._id);
       } else {
-        const newSession = await createSessionApi("Session 1");
+        const newSession = await createSessionApi("Chat 1");
         setChatSessions([newSession]);
         setActiveSession(newSession._id);
         localStorage.setItem("activeSession", newSession._id);
@@ -58,12 +63,25 @@ export const useChatSessions = () => {
   const createSession = useCallback(async (customName) => {
     try {
       setLoading(true);
-      // Use functional updater to get current length without stale closure
-      let sessionCount = 0;
-      setChatSessions((prev) => { sessionCount = prev?.length || 0; return prev; });
+      const currentList = chatSessionsRef.current || [];
+
+      // Determine next chat number by checking existing "Chat N" or "Session N" numbers
+      let nextNum = currentList.length + 1;
+      const existingNums = currentList
+        .map((s) => {
+          const match = (s.sessionName || "").match(/(?:Chat|Session)\s+(\d+)/i);
+          return match ? parseInt(match[1], 10) : null;
+        })
+        .filter((n) => n !== null && !isNaN(n));
+
+      if (existingNums.length > 0) {
+        nextNum = Math.max(...existingNums) + 1;
+      }
+
       const name = typeof customName === "string" && customName.trim()
         ? customName.trim()
-        : `Chat ${sessionCount + 1}`;
+        : `Chat ${nextNum}`;
+
       const newSession = await createSessionApi(name);
       const newId = (newSession._id || newSession.sessionId)?.toString();
 
@@ -77,7 +95,7 @@ export const useChatSessions = () => {
       setMessages([]);
       setAudioConversationHistory([]);
       messageIdRef.current = 1;
-      antdMessage.success("New chat created");
+      antdMessage.success(`Created ${newSession.sessionName || name}`);
       return newSession;
     } catch (err) {
       console.error("[useChatSessions] createSession error:", err);

@@ -75,11 +75,15 @@ export const useAudioSession = ({
 
         case "transcript":
           if (data.speaker === "USER") {
-            inputTranscriptRef.current = data.text || "";
-            setInputTranscript(data.text || "");
+            if (data.text) {
+              inputTranscriptRef.current = data.text;
+              setInputTranscript(data.text);
+            }
           } else if (data.speaker === "MODEL") {
-            outputTranscriptRef.current = data.text || "";
-            setOutputTranscript(data.text || "");
+            if (data.text) {
+              outputTranscriptRef.current = data.text;
+              setOutputTranscript(data.text);
+            }
           }
           break;
 

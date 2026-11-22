@@ -144,72 +144,181 @@ const ChatPage = () => {
       <video ref={videoRef} style={{ display: "none" }} autoPlay muted width="640" height="480" />
       <canvas ref={canvasRef} style={{ display: "none" }} width="640" height="480" />
 
-      <Layout style={{ height: "100vh" }}>
+      <Layout style={{ height: "calc(100dvh - 80px)", minHeight: "calc(100vh - 80px)", overflow: "hidden" }}>
         {/* Sidebar: session list + action buttons */}
         <Sider
-          width={260} collapsible collapsed={collapsed} collapsedWidth={60}
+          width={260}
+          collapsible
+          collapsed={collapsed}
+          collapsedWidth={65}
           onCollapse={(val) => setCollapsed(val)}
-          style={{ height: "100vh", background: "#f9a8d4", overflow: "hidden", boxShadow: "2px 0 8px rgba(0,0,0,0.05)" }}
+          style={{
+            height: "calc(100dvh - 80px)",
+            background: "#f9a8d4",
+            overflow: "hidden",
+            boxShadow: "2px 0 8px rgba(0,0,0,0.05)",
+          }}
         >
-          <div style={{ padding: "18px 16px", textAlign: "center" }}>
-            <h3 style={{ color: "#fff", margin: 0, fontWeight: "bold" }}>
-              {!collapsed ? "Chat Sessions" : "💬"}
-            </h3>
-          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              overflow: "hidden",
+            }}
+          >
+            {/* Header: fixed at top */}
+            <div style={{ padding: "16px 12px", textAlign: "center", flexShrink: 0 }}>
+              <h3 style={{ color: "#fff", margin: 0, fontWeight: "bold", fontSize: collapsed ? "18px" : "16px" }}>
+                {!collapsed ? "Chat Sessions" : "💬"}
+              </h3>
+            </div>
 
-          {/* Session list – click to switch & load messages */}
-          <Menu
-            theme="light" mode="inline"
-            selectedKeys={[activeSession]}
-            onClick={({ key }) => { setActiveSession(key); fetchMessages(key); }}
-            style={{ background: "transparent", border: "none" }}
-            items={chatSessions.map((s) => ({
-              key: s._id || s.sessionId, icon: <MessageOutlined />,
-              label: !collapsed ? s.sessionName : "",
-            }))}
-          />
-
-          <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            {/* New Chat */}
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => createSession()}
-              style={{ backgroundColor: "#ff4caf", borderColor: "#d9363e", color: "white", fontWeight: "bold", borderRadius: "8px", height: "40px" }}>
-              {!collapsed && <span>New Chat</span>}
-            </Button>
-
-            {/* Switch to Audio modal */}
-            <Button type="primary" icon={<PhoneOutlined />} onClick={() => setIsAudioModalVisible(true)}
-              style={{ backgroundColor: "#007AFF", borderColor: "#0056b3", color: "white", fontWeight: "bold", borderRadius: "8px", height: "40px" }}>
-              {!collapsed && <span>Switch to Audio</span>}
-            </Button>
-
-            {/* Emotion detection toggle: green=off, red=on */}
-            <Button type="primary" icon={<CameraOutlined />}
-              onClick={() => setEmotionDetectionEnabled((p) => !p)}
+            {/* Session list – independently scrollable */}
+            <div
               style={{
-                backgroundColor: emotionDetectionEnabled ? "#d32f2f" : "#4CAF50",
-                borderColor:     emotionDetectionEnabled ? "#b71c1c" : "#388E3C",
-                color: "white", fontWeight: "bold", borderRadius: "8px", height: "40px",
-              }}>
-              {!collapsed && <span>{emotionDetectionEnabled ? "Stop Emotion Capture" : "Capture Emotion"}</span>}
-            </Button>
+                flex: 1,
+                overflowY: "auto",
+                overflowX: "hidden",
+                minHeight: 0,
+                padding: collapsed ? "0 4px" : "0 8px",
+              }}
+            >
+              <Menu
+                theme="light"
+                mode="inline"
+                selectedKeys={[activeSession]}
+                onClick={({ key }) => {
+                  setActiveSession(key);
+                  fetchMessages(key);
+                }}
+                style={{ background: "transparent", border: "none" }}
+                items={chatSessions.map((s, idx) => {
+                  const displayName = s.sessionName || `Chat ${chatSessions.length - idx}`;
+                  return {
+                    key: s._id || s.sessionId,
+                    icon: <MessageOutlined style={{ fontSize: "16px" }} />,
+                    label: !collapsed ? displayName : "",
+                    title: displayName,
+                  };
+                })}
+              />
+            </div>
+
+            {/* Pinned action buttons at bottom of sidebar */}
+            <div
+              style={{
+                flexShrink: 0,
+                marginTop: "auto",
+                padding: collapsed ? "10px 6px" : "14px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                borderTop: "1px solid rgba(255, 255, 255, 0.3)",
+                background: "#f9a8d4",
+              }}
+            >
+              {/* New Chat */}
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => createSession()}
+                title="New Chat"
+                style={{
+                  backgroundColor: "#ff4caf",
+                  borderColor: "#d9363e",
+                  color: "white",
+                  fontWeight: "bold",
+                  borderRadius: "8px",
+                  height: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {!collapsed && <span>New Chat</span>}
+              </Button>
+
+              {/* Switch to Audio modal */}
+              <Button
+                type="primary"
+                icon={<PhoneOutlined />}
+                onClick={() => setIsAudioModalVisible(true)}
+                title="Switch to Audio"
+                style={{
+                  backgroundColor: "#007AFF",
+                  borderColor: "#0056b3",
+                  color: "white",
+                  fontWeight: "bold",
+                  borderRadius: "8px",
+                  height: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {!collapsed && <span>Switch to Audio</span>}
+              </Button>
+
+              {/* Emotion detection toggle: green=off, red=on */}
+              <Button
+                type="primary"
+                icon={<CameraOutlined />}
+                onClick={() => setEmotionDetectionEnabled((p) => !p)}
+                title={emotionDetectionEnabled ? "Stop Emotion Capture" : "Capture Emotion"}
+                style={{
+                  backgroundColor: emotionDetectionEnabled ? "#d32f2f" : "#4CAF50",
+                  borderColor: emotionDetectionEnabled ? "#b71c1c" : "#388E3C",
+                  color: "white",
+                  fontWeight: "bold",
+                  borderRadius: "8px",
+                  height: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {!collapsed && <span>{emotionDetectionEnabled ? "Stop Emotion Capture" : "Capture Emotion"}</span>}
+              </Button>
+            </div>
           </div>
         </Sider>
 
         {/* Main chat content */}
-        <Layout>
-          <Content style={{ padding: "20px", display: "flex", flexDirection: "column", height: "100vh", background: "#fff" }}>
+        <Layout style={{ height: "calc(100dvh - 80px)", background: "#fff", overflow: "hidden" }}>
+          <Content
+            style={{
+              padding: "16px 20px",
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              background: "#fff",
+              overflow: "hidden",
+            }}
+          >
 
             {/* Messages scroll area */}
-            <motion.div style={{
-              flex: 1, overflowY: "auto", marginBottom: "20px", padding: "16px",
-              border: "1px solid #f0f0f0", borderRadius: "12px", background: "#fafafa",
-            }}>
+            <motion.div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                marginBottom: "12px",
+                padding: "16px",
+                border: "1px solid #f0f0f0",
+                borderRadius: "12px",
+                background: "#fafafa",
+                minHeight: 0,
+              }}
+            >
               {messages.map((msg, i) => (
                 <motion.div
                   key={msg.id || i}
-                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                   style={{
-                    marginBottom: "15px", padding: "12px 16px", borderRadius: "12px",
+                    marginBottom: "15px",
+                    padding: "12px 16px",
+                    borderRadius: "12px",
                     backgroundColor: msg.sender === "user" ? "#e6f7ff" : msg.sender === "bot" ? "#fff" : "#f0f0f0",
                     border: msg.sender === "bot" ? "1px solid #ffe4ed" : "none",
                     boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
@@ -256,11 +365,19 @@ const ChatPage = () => {
               <div ref={messagesEndRef} />
             </motion.div>
 
-            {/* Input bar: [text] [🎤 voice] [➤ send] */}
-            <div style={{
-              display: "flex", gap: "10px", alignItems: "center", padding: "12px",
-              background: "#fafafa", border: "1px solid #f0f0f0", borderRadius: "12px",
-            }}>
+            {/* Input bar: sticky/fixed to bottom */}
+            <div
+              style={{
+                flexShrink: 0,
+                display: "flex",
+                gap: "10px",
+                alignItems: "center",
+                padding: "12px 16px",
+                background: "#fafafa",
+                border: "1px solid #f0f0f0",
+                borderRadius: "12px",
+              }}
+            >
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -285,7 +402,7 @@ const ChatPage = () => {
 
             {/* Optional TTS playback (shown only when backend returns an audio URL) */}
             {audioUrl && (
-              <Button onClick={handlePlayAudio} style={{ marginTop: "10px", alignSelf: "center" }}>
+              <Button onClick={handlePlayAudio} style={{ marginTop: "10px", alignSelf: "center", flexShrink: 0 }}>
                 🔊 Play Audio Response
               </Button>
             )}

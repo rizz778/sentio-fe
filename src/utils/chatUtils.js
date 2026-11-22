@@ -70,30 +70,47 @@ export const buildConversationTurns = (messages, newUserMessage = null) => {
  * Format backend message items into standard UI message structure
  */
 export const formatMessagesForUi = (rawMessages = []) => {
-  const sorted = [...rawMessages].sort((a, b) => {
-    const aTime = a.timestamp ? new Date(a.timestamp).getTime() : a._id || 0;
-    const bTime = b.timestamp ? new Date(b.timestamp).getTime() : b._id || 0;
-    return aTime - bTime;
-  });
+  return (rawMessages || [])
+    .filter((msg) => {
+      // Drop messages with no usable text
+      const text =
+        typeof msg.text === "string" && msg.text.trim() !== ""
+          ? msg.text
+          : typeof msg.content === "string" && msg.content.trim() !== ""
+          ? msg.content
+          : "";
+      return text.length > 0;
+    })
+    .map((msg, idx) => {
+      // Normalise sender: backend stores "user", "bot", "model", "assistant"
+      const rawSender = (msg.sender || msg.type || "").toString().toLowerCase().trim();
+      let sender = "system";
+      if (rawSender === "user") {
+        sender = "user";
+      } else if (
+        rawSender === "bot" ||
+        rawSender === "model" ||
+        rawSender === "assistant" ||
+        rawSender === "sentio" ||
+        rawSender === "sentio ai" ||
+        rawSender === "ai"
+      ) {
+        sender = "bot";
+      }
 
-  return sorted.map((msg, idx) => {
-    let sender = "system";
-    if (msg.sender === "user" || msg.type === "user") sender = "user";
-    else if (msg.sender === "bot" || msg.type === "model") sender = "bot";
+      const text =
+        typeof msg.text === "string" && msg.text.trim() !== ""
+          ? msg.text
+          : typeof msg.content === "string"
+          ? msg.content
+          : "";
 
-    const text =
-      typeof msg.text === "string" && msg.text.trim() !== ""
-        ? msg.text
-        : typeof msg.content === "string"
-        ? msg.content
-        : "";
-
-    return {
-      ...msg,
-      id: idx + 1,
-      sender,
-      text,
-      content: text,
-    };
-  });
+      return {
+        ...msg,
+        id: idx + 1,
+        sender,
+        text,
+        content: text,
+      };
+    });
 };
