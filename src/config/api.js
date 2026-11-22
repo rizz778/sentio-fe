@@ -5,14 +5,54 @@
  * across components, pages, hooks, and feature APIs.
  */
 
-export const GATEWAY_URL =
-  import.meta.env.VITE_GATEWAY_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://localhost:4000";
+// Determine base Gateway REST URL (auto-upgrade http -> https on remote/HTTPS pages)
+const getRawGatewayUrl = () => {
+  return (
+    import.meta.env.VITE_GATEWAY_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:4000"
+  ).trim().replace(/\/+$/, "");
+};
 
-export const WS_GATEWAY_URL =
-  import.meta.env.VITE_WS_URL ||
-  "ws://localhost:4000";
+const resolveGatewayUrl = () => {
+  let url = getRawGatewayUrl();
+  const isHttpsPage = typeof window !== "undefined" && window.location.protocol === "https:";
+  const isRemote = !url.includes("localhost") && !url.includes("127.0.0.1");
+  if ((isHttpsPage || isRemote) && url.startsWith("http://")) {
+    url = url.replace("http://", "https://");
+  }
+  return url;
+};
+
+// Determine Gateway WebSocket URL (auto-upgrade ws -> wss on remote/HTTPS pages)
+const resolveWsUrl = () => {
+  let url = (
+    import.meta.env.VITE_WS_URL ||
+    import.meta.env.VITE_GEMINI_WS_AUDIO_URL ||
+    ""
+  ).trim().replace(/\/+$/, "");
+
+  if (!url) {
+    const gw = resolveGatewayUrl();
+    url = gw.replace(/^https?:/, gw.startsWith("https") ? "wss:" : "ws:");
+  }
+
+  // Normalize protocol
+  if (url.startsWith("http://")) url = url.replace("http://", "ws://");
+  if (url.startsWith("https://")) url = url.replace("https://", "wss://");
+
+  const isHttpsPage = typeof window !== "undefined" && window.location.protocol === "https:";
+  const isRemote = !url.includes("localhost") && !url.includes("127.0.0.1");
+
+  if ((isHttpsPage || isRemote) && url.startsWith("ws://")) {
+    url = url.replace("ws://", "wss://");
+  }
+
+  return url;
+};
+
+export const GATEWAY_URL = resolveGatewayUrl();
+export const WS_GATEWAY_URL = resolveWsUrl();
 
 export const API_ENDPOINTS = {
   AUTH: {

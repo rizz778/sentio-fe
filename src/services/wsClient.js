@@ -31,7 +31,17 @@ export const GEMINI_WS_AUDIO_URL = `${WS_GATEWAY_URL}${API_ENDPOINTS.WS_LIVE}?mo
 
 export class WSClient {
   constructor(url, { onOpen, onMessage, onClose, onError } = {}) {
-    this._ws = new WebSocket(url);
+    let targetUrl = url;
+    if (
+      typeof window !== "undefined" &&
+      window.location.protocol === "https:" &&
+      targetUrl.startsWith("ws://") &&
+      !targetUrl.includes("localhost") &&
+      !targetUrl.includes("127.0.0.1")
+    ) {
+      targetUrl = targetUrl.replace("ws://", "wss://");
+    }
+    this._ws = new WebSocket(targetUrl);
     this._ws.binaryType = "arraybuffer";
 
     this._ws.onopen = () => {
