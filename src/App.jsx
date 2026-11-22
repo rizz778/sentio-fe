@@ -40,6 +40,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
+          <Route path="/index.html" element={<Navigate to="/" replace />} />
           <Route path="/login" element={isAuthenticated ? <Navigate to="/chat" replace /> : <Login />} />
           <Route path="/signup" element={isAuthenticated ? <Navigate to="/chat" replace /> : <Signup />} />
           <Route path="/resource" element={<Resource />} />
@@ -61,6 +62,9 @@ function App() {
           <Route path="/chat" element={isAuthenticated ? <ChatPage /> : <Navigate to="/login" />} />
           <Route path="/profile" element={isAuthenticated ? <ProfilePage /> : <Navigate to="/login" />} />
           <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </div>
