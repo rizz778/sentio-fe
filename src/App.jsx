@@ -40,7 +40,6 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
-          <Route path="/index.html" element={<Navigate to={isAuthenticated ? "/chat" : "/"} replace />} />
           <Route path="/login" element={isAuthenticated ? <Navigate to="/chat" replace /> : <Login />} />
           <Route path="/signup" element={isAuthenticated ? <Navigate to="/chat" replace /> : <Signup />} />
           <Route path="/resource" element={<Resource />} />
