@@ -11,9 +11,9 @@ import { motion } from "framer-motion";
 import GeminiAudioChatModal from "../components/audio-test2";
 import { formatText, createMessageObject } from "../utils/chatUtils";
 
-import { useChatSessions }         from "../hooks/useChatSessions";
-import { useEmotionDetection }     from "../hooks/useEmotionDetection";
-import { useGeminiChat }           from "../hooks/useGeminiChat";
+import { useChatSessions } from "../hooks/useChatSessions";
+import { useEmotionDetection } from "../hooks/useEmotionDetection";
+import { useGeminiChat } from "../hooks/useGeminiChat";
 import { useDistressNotification } from "../hooks/useDistressNotification";
 
 const { Sider, Content } = Layout;
@@ -53,11 +53,11 @@ const ChatPage = () => {
   });
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [collapsed, setCollapsed]                     = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [isAudioModalVisible, setIsAudioModalVisible] = useState(false);
-  const [input, setInput]                             = useState("");
-  const [listening, setListening]                     = useState(false);
-  const [audioUrl, setAudioUrl]                       = useState("");
+  const [input, setInput] = useState("");
+  const [listening, setListening] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
 
   // ── Message helpers ───────────────────────────────────────────────────────
   // Appends to both the visible list and the audio modal history mirror
