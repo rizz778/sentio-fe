@@ -1,8 +1,11 @@
 /**
- * useAudioRecorder.js — Hook: Microphone capture via AudioWorklet
- * ================================================================
+ * useAudioRecorder.js — Hook: Continuous Microphone Streaming via AudioWorklet
+ * ============================================================================
  * Captures microphone audio using a dedicated AudioWorklet thread off the
  * main UI thread for glitch-free, ultra-low-latency 16kHz audio capture.
+ * Continuously streams 16-bit PCM chunks (~128ms) via onChunk callback for true
+ * real-time bidirectional Gemini Live conversations.
+ *
  * Automatically falls back to ScriptProcessor if AudioWorklet is unavailable.
  *
  * @param {Function} addLog - Logger from useAudioLogger
@@ -11,21 +14,34 @@
 
 import { useState, useRef, useCallback } from "react";
 import { MIC_CONFIG } from "../constants/audioConfig";
-import { convertTo16BitPCM, convertPCMToBase64 } from "../utils/audioUtils";
+import { convertTo16BitPCM } from "../utils/audioUtils";
 
 /**
  * Inlined AudioWorkletProcessor code executed on the Web Audio rendering thread.
- * Forwards raw Float32 audio samples via MessagePort without main thread blocking.
+ * Batches incoming Float32 samples into ~2048-sample frames (~128ms at 16kHz)
+ * and posts them to the main thread without blocking UI.
  */
 const RECORDER_WORKLET_CODE = `
 class RecorderWorkletProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.bufferSize = 2048; // ~128ms at 16kHz
+    this.buffer = new Float32Array(this.bufferSize);
+    this.bufferIndex = 0;
+  }
+
   process(inputs, outputs, parameters) {
     const input = inputs[0];
     if (input && input.length > 0) {
       const channelData = input[0];
-      if (channelData && channelData.length > 0) {
-        // Post Float32 chunk to main thread
-        this.port.postMessage(channelData);
+      for (let i = 0; i < channelData.length; i++) {
+        this.buffer[this.bufferIndex++] = channelData[i];
+        if (this.bufferIndex >= this.bufferSize) {
+          // Post chunk to main thread
+          this.port.postMessage(this.buffer);
+          this.buffer = new Float32Array(this.bufferSize);
+          this.bufferIndex = 0;
+        }
       }
     }
     return true; // Keep processor alive
@@ -48,26 +64,26 @@ export const useAudioRecorder = (addLog) => {
 
   const streamRef           = useRef(null);  // MediaStream from getUserMedia
   const audioProcessorRef   = useRef(null);  // { context, source, processor }
-  const audioChunksRef      = useRef([]);    // Accumulated Float32Array chunks
-  const recordingTimeoutRef = useRef(null);  // Auto-stop timer handle
-  const recordingEmotionRef = useRef("");    // Snapshot of emotion at start-of-record
+  const onChunkCallbackRef  = useRef(null);  // Callback for streaming PCM chunks
+  const recordingEmotionRef = useRef("");    // Snapshot of emotion
 
-  // ── Start ─────────────────────────────────────────────────────────────────
+  // ── Start Continuous Recording ──────────────────────────────────────────
 
   /**
-   * Start capturing microphone audio via AudioWorklet (with ScriptProcessor fallback).
+   * Start capturing microphone audio and stream PCM-16 chunks in real-time.
    *
-   * @param {string} currentEmotion - Emotion label to tag the recording with
-   * @param {Function} onAutoStop   - Called when the 5-second auto-stop fires
+   * @param {Function} onChunk      - Called on each 16-bit PCM chunk (ArrayBuffer)
+   * @param {string}   currentEmotion - Emotion label to tag the session with
    */
-  const startRecording = useCallback(async (currentEmotion = "", onAutoStop) => {
+  const startRecording = useCallback(async (onChunk, currentEmotion = "") => {
     try {
+      onChunkCallbackRef.current = onChunk;
+      recordingEmotionRef.current = currentEmotion;
+
       const stream = await navigator.mediaDevices.getUserMedia(MIC_CONFIG);
       streamRef.current = stream;
-      recordingEmotionRef.current = currentEmotion;
-      audioChunksRef.current = [];
 
-      // Use a 16kHz input AudioContext for speech recognition / Gemini Live
+      // 16kHz input AudioContext for Gemini Live
       const inputCtx = new (window.AudioContext || window.webkitAudioContext)({
         sampleRate: 16000,
         latencyHint: "interactive",
@@ -81,54 +97,45 @@ export const useAudioRecorder = (addLog) => {
         const workletNode = new AudioWorkletNode(inputCtx, "recorder-worklet-processor");
 
         workletNode.port.onmessage = (event) => {
-          if (event.data) {
-            audioChunksRef.current.push(new Float32Array(event.data));
+          if (event.data && onChunkCallbackRef.current) {
+            const pcm16 = convertTo16BitPCM(event.data);
+            onChunkCallbackRef.current(pcm16.buffer);
           }
         };
 
         source.connect(workletNode);
         audioProcessorRef.current = { context: inputCtx, source, processor: workletNode };
-        addLog?.("Recording started (AudioWorklet, 16kHz, real-time thread)", "success");
+        addLog?.("Live voice streaming started (AudioWorklet, 16kHz continuous)", "success");
       } else {
-        // Fallback for legacy environments
+        // Fallback for environments without AudioWorklet
         const processor = inputCtx.createScriptProcessor(2048, 1, 1);
         processor.onaudioprocess = (event) => {
-          const channelData = event.inputBuffer.getChannelData(0);
-          audioChunksRef.current.push(new Float32Array(channelData));
+          if (onChunkCallbackRef.current) {
+            const channelData = event.inputBuffer.getChannelData(0);
+            const pcm16 = convertTo16BitPCM(channelData);
+            onChunkCallbackRef.current(pcm16.buffer);
+          }
         };
         source.connect(processor);
         processor.connect(inputCtx.destination);
         audioProcessorRef.current = { context: inputCtx, source, processor };
-        addLog?.("Recording started (ScriptProcessor fallback, 16kHz)", "success");
+        addLog?.("Live voice streaming started (ScriptProcessor fallback, 16kHz continuous)", "success");
       }
 
       setIsRecording(true);
-
-      // Auto-stop after 5 seconds to prevent runaway recordings
-      recordingTimeoutRef.current = setTimeout(() => {
-        onAutoStop?.();
-      }, 5000);
     } catch (err) {
-      addLog?.(`Recording error: ${err.message}`, "error");
+      addLog?.(`Microphone access error: ${err.message}`, "error");
     }
   }, [addLog]);
 
-  // ── Stop ──────────────────────────────────────────────────────────────────
+  // ── Stop Recording ────────────────────────────────────────────────────────
 
   /**
-   * Stop recording, combine buffered chunks, and return the encoded PCM.
-   *
-   * @returns {Promise<{ base64Data: string, pcmData: ArrayBuffer, emotion: string } | null>}
-   *   null if no audio was captured
+   * Stop recording and teardown mic stream.
    */
   const stopRecording = useCallback(async () => {
-    // Clear auto-stop timer
-    if (recordingTimeoutRef.current) {
-      clearTimeout(recordingTimeoutRef.current);
-      recordingTimeoutRef.current = null;
-    }
+    onChunkCallbackRef.current = null;
 
-    // Teardown processor and input AudioContext
     if (audioProcessorRef.current) {
       try {
         if (audioProcessorRef.current.processor.port) {
@@ -141,41 +148,19 @@ export const useAudioRecorder = (addLog) => {
       audioProcessorRef.current = null;
     }
 
-    // Stop mic stream tracks
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
 
     setIsRecording(false);
-
-    // No audio captured — nothing to return
-    if (audioChunksRef.current.length === 0) return null;
-
-    // Combine all Float32Array chunks into one contiguous buffer
-    let totalSamples = 0;
-    audioChunksRef.current.forEach((c) => { totalSamples += c.length; });
-    const combined = new Float32Array(totalSamples);
-    let offset = 0;
-    audioChunksRef.current.forEach((c) => { combined.set(c, offset); offset += c.length; });
-    audioChunksRef.current = [];
-
-    const pcm16      = convertTo16BitPCM(combined);
-    const base64Data = convertPCMToBase64(pcm16);
-    const emotion    = recordingEmotionRef.current;
-
-    addLog?.(
-      `Audio captured (${(pcm16.length / 16000).toFixed(2)}s)${emotion ? ` emotion: ${emotion}` : ""}`,
-      "user-input"
-    );
-
-    return { base64Data, pcmData: pcm16.buffer, emotion };
+    addLog?.("Microphone stopped", "info");
   }, [addLog]);
 
   // ── Cleanup ───────────────────────────────────────────────────────────────
 
   const cleanup = useCallback(() => {
-    if (recordingTimeoutRef.current) clearTimeout(recordingTimeoutRef.current);
+    onChunkCallbackRef.current = null;
     if (audioProcessorRef.current) {
       try {
         if (audioProcessorRef.current.processor.port) {

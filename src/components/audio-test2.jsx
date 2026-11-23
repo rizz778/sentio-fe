@@ -125,29 +125,28 @@ const GeminiAudioChatModal = ({
   // ── Recording handlers ────────────────────────────────────────────────────
 
   const handleStartRecording = useCallback(async () => {
-    // Cut off any playing or queued previous response and signal Gemini to stop old turn
-    interrupt();
     const currentEmotion = emotionDetectionEnabled ? emotion.aggregated || "" : "";
-    await startRecording(currentEmotion, handleStopRecording);
-  }, [emotionDetectionEnabled, emotion, startRecording, interrupt]);
+    await startRecording((pcmChunk) => {
+      if (!isMuted) {
+        sendAudio(pcmChunk);
+      }
+    }, currentEmotion);
+  }, [emotionDetectionEnabled, emotion, startRecording, isMuted, sendAudio]);
 
   const handleStopRecording = useCallback(async () => {
-    const result = await stopRecording();
-    if (result) {
-      sendAudio(result.pcmData || result.base64Data, result.emotion);
-    }
-  }, [stopRecording, sendAudio]);
+    await stopRecording();
+  }, [stopRecording]);
 
   // ── Modal close ───────────────────────────────────────────────────────────
 
   const handleClose = useCallback(() => {
-    if (isRecording) handleStopRecording();
+    if (isRecording) stopRecording();
     disconnect();
     clearAudioQueue();
     destroyAudioContext();
     onClose?.();
     onAudioChatClose?.(sessionId);
-  }, [isRecording, handleStopRecording, disconnect, clearAudioQueue, destroyAudioContext, onClose, onAudioChatClose, sessionId]);
+  }, [isRecording, stopRecording, disconnect, clearAudioQueue, destroyAudioContext, onClose, onAudioChatClose, sessionId]);
 
   // ==========================================================================
   // Render
@@ -185,16 +184,22 @@ const GeminiAudioChatModal = ({
         )}
 
         {/* Mic toggle — enabled only when WS is connected */}
-        <div style={{ margin: "16px 0" }}>
+        <div style={{ margin: "16px 0", display: "flex", justifyContent: "center", gap: 10 }}>
           <Button
             type={isRecording ? "primary" : "default"}
+            danger={isRecording}
             icon={isRecording ? <MicOff /> : <Mic />}
             onClick={isRecording ? handleStopRecording : handleStartRecording}
             disabled={connectionStatus !== "connected"}
-            style={{ marginRight: 8 }}
           >
-            {isRecording ? "Stop" : "Start"} Recording
+            {isRecording ? "Mute Microphone" : "Start Live Voice Call"}
           </Button>
+
+          {isRecording && (
+            <Button onClick={interrupt}>
+              Interrupt AI
+            </Button>
+          )}
         </div>
 
         {/* Transcript display */}
