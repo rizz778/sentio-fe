@@ -43,7 +43,14 @@ const ChatPage = () => {
     setEmotionDetectionEnabled,
     videoRef,
     canvasRef,
-  } = useEmotionDetection(activeSession);
+  } = useEmotionDetection(activeSession, {
+    onFrame: (frameMsg) => {
+      // Send camera frames through the existing Gemini WS connection (not a separate one)
+      if (sendWsMessage && isConnected) {
+        sendWsMessage(frameMsg);
+      }
+    },
+  });
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [collapsed, setCollapsed]                     = useState(false);
@@ -75,6 +82,7 @@ const ChatPage = () => {
     distressScore,
     sendTurn,
     refreshSession,
+    send: sendWsMessage,
   } = useGeminiChat({
     activeSession,
     addMessage,

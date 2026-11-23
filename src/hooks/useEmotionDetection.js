@@ -48,6 +48,7 @@ export const useEmotionDetection = (sessionId = "emotion-session", options = {})
     }
 
     // Request webcam access and start frame-capture loop (1 frame every 1.5s to conserve bandwidth)
+    console.log("[EmotionDetection] Requesting camera access via getUserMedia...");
     navigator.mediaDevices
       ?.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } } })
       .then((mediaStream) => {
@@ -55,16 +56,21 @@ export const useEmotionDetection = (sessionId = "emotion-session", options = {})
           mediaStream.getTracks().forEach((t) => t.stop());
           return;
         }
+        console.log("[EmotionDetection] Camera access granted:", mediaStream.getVideoTracks().map(t => t.label));
         stream = mediaStream;
 
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
+          videoRef.current.setAttribute("playsinline", "true");
           videoRef.current.onloadedmetadata = () => {
+            console.log(`[EmotionDetection] Video ready: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
             if (canvasRef.current && videoRef.current) {
               canvasRef.current.width = videoRef.current.videoWidth || 640;
               canvasRef.current.height = videoRef.current.videoHeight || 480;
-              videoRef.current.play().catch((e) => console.warn("Video play() failed:", e));
             }
+            videoRef.current.play()
+              .then(() => console.log("[EmotionDetection] Video playback started."))
+              .catch((e) => console.warn("[EmotionDetection] Video play() failed:", e));
           };
         }
 
@@ -102,7 +108,10 @@ export const useEmotionDetection = (sessionId = "emotion-session", options = {})
           }
         }, 1500);
       })
-      .catch((err) => console.error("[Emotion] Camera access error:", err));
+      .catch((err) => {
+        console.error("[EmotionDetection] Camera access error:", err);
+        alert(`Camera access denied or unavailable: ${err.message}`);
+      });
 
     return () => {
       mounted = false;
