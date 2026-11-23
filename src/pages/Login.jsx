@@ -30,7 +30,7 @@ const Login = () => {
       }
       await signInWithGoogle(credential);
       message.success('Signed in successfully!');
-      const redirectPath = location.state?.from?.pathname || '/chat';
+      const redirectPath = location.state?.from?.pathname || '/profile';
       navigate(redirectPath, { replace: true });
     } catch (error) {
       console.error('Google login error:', error);
