@@ -110,7 +110,15 @@ export const useEmotionDetection = (sessionId = "emotion-session", options = {})
       })
       .catch((err) => {
         console.error("[EmotionDetection] Camera access error:", err);
-        alert(`Camera access denied or unavailable: ${err.message}`);
+        // Silently disable — no alert, since device may simply not have a camera
+        if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+          console.warn("[EmotionDetection] No camera device found. Emotion detection disabled.");
+        } else if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          console.warn("[EmotionDetection] Camera permission denied. Enable camera access in browser settings.");
+        } else {
+          console.warn("[EmotionDetection] Camera unavailable:", err.message);
+        }
+        if (mounted) setEmotionDetectionEnabled(false);
       });
 
     return () => {
