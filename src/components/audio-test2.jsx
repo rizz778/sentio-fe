@@ -148,30 +148,71 @@ const GeminiAudioChatModal = ({
     onAudioChatClose?.(sessionId);
   }, [isRecording, stopRecording, disconnect, clearAudioQueue, destroyAudioContext, onClose, onAudioChatClose, sessionId]);
 
+  // ── Mobile viewport detection ─────────────────────────────────────────────
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 640);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   // ==========================================================================
   // Render
   // ==========================================================================
   return (
     <Modal
-      title="Gemini Audio Chat"
+      title={
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: isMobile ? 15 : 17 }}>
+          <span style={{ fontSize: 18 }}>🎙️</span>
+          <span>Gemini Live Voice Call</span>
+          {isRecording && (
+            <span
+              style={{
+                fontSize: 11,
+                background: "#e6f7ff",
+                color: "#007AFF",
+                border: "1px solid #91caff",
+                borderRadius: 12,
+                padding: "2px 8px",
+                fontWeight: "normal",
+              }}
+            >
+              ● LIVE
+            </span>
+          )}
+        </div>
+      }
       open={visible}
       onCancel={handleClose}
+      width="min(95vw, 540px)"
+      style={{ top: isMobile ? 12 : 40, maxWidth: "96vw" }}
       footer={[
-        <Button key="close" onClick={handleClose} disabled={isCalling || isRecording}>
-          Close
-        </Button>,
         <Button
           key="emotion"
           onClick={() => setEmotionDetectionEnabled((v) => !v)}
           type={emotionDetectionEnabled ? "primary" : "default"}
+          size={isMobile ? "small" : "middle"}
         >
-          {emotionDetectionEnabled ? "Disable Emotion Detection" : "Enable Emotion Detection"}
+          {emotionDetectionEnabled
+            ? (isMobile ? "Emotion: ON" : "Disable Emotion")
+            : (isMobile ? "Emotion: OFF" : "Enable Emotion")}
+        </Button>,
+        <Button
+          key="close"
+          onClick={handleClose}
+          disabled={isCalling || isRecording}
+          size={isMobile ? "small" : "middle"}
+        >
+          Close
         </Button>,
       ]}
-      width={600}
     >
-      <div style={{ textAlign: "center", padding: 20 }}>
-        <p>Start a real-time audio conversation with the assistant.</p>
+      <div style={{ textAlign: "center", padding: isMobile ? "8px 4px" : "16px 12px" }}>
+        <p style={{ margin: "0 0 10px 0", color: "#666", fontSize: isMobile ? 13 : 14 }}>
+          {isRecording
+            ? "Live bidirectional audio active. Speak naturally; Gemini responds in real-time."
+            : "Tap below to connect your microphone and speak in real-time."}
+        </p>
 
         {/* Connection / error status bar */}
         {log && (
@@ -179,24 +220,46 @@ const GeminiAudioChatModal = ({
             message={log}
             type={connectionStatus === "error" ? "error" : "info"}
             showIcon
-            style={{ marginTop: 10 }}
+            style={{ marginTop: 8, marginBottom: 8, fontSize: isMobile ? 12 : 13, textAlign: "left" }}
           />
         )}
 
-        {/* Mic toggle — enabled only when WS is connected */}
-        <div style={{ margin: "16px 0", display: "flex", justifyContent: "center", gap: 10 }}>
+        {/* Mic toggle & action buttons */}
+        <div
+          style={{
+            margin: "14px 0",
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: isMobile ? 8 : 12,
+          }}
+        >
           <Button
             type={isRecording ? "primary" : "default"}
             danger={isRecording}
-            icon={isRecording ? <MicOff /> : <Mic />}
+            icon={isRecording ? <MicOff size={16} /> : <Mic size={16} />}
             onClick={isRecording ? handleStopRecording : handleStartRecording}
             disabled={connectionStatus !== "connected"}
+            size={isMobile ? "middle" : "large"}
+            style={{
+              borderRadius: 8,
+              minWidth: isMobile ? 140 : 180,
+              height: isMobile ? 38 : 42,
+              fontWeight: 600,
+            }}
           >
             {isRecording ? "Mute Microphone" : "Start Live Voice Call"}
           </Button>
 
           {isRecording && (
-            <Button onClick={interrupt}>
+            <Button
+              onClick={interrupt}
+              size={isMobile ? "middle" : "large"}
+              style={{
+                borderRadius: 8,
+                height: isMobile ? 38 : 42,
+              }}
+            >
               Interrupt AI
             </Button>
           )}
@@ -204,17 +267,31 @@ const GeminiAudioChatModal = ({
 
         {/* Transcript display */}
         {(inputTranscript || outputTranscript) && (
-          <div style={{ margin: "16px 0", textAlign: "left", background: "#f6f6f6", borderRadius: 8, padding: 12 }}>
+          <div
+            style={{
+              margin: "14px 0",
+              textAlign: "left",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              padding: isMobile ? "10px 12px" : "14px 16px",
+              maxHeight: isMobile ? "30vh" : "38vh",
+              overflowY: "auto",
+              fontSize: isMobile ? 13 : 14,
+              lineHeight: 1.5,
+              wordBreak: "break-word",
+            }}
+          >
             {inputTranscript && (
-              <div style={{ marginBottom: 6 }}>
-                <b>You:</b>{" "}
-                <span style={{ color: "#333" }}>{inputTranscript}</span>
+              <div style={{ marginBottom: 8 }}>
+                <b style={{ color: "#007AFF" }}>You:</b>{" "}
+                <span style={{ color: "#1e293b" }}>{inputTranscript}</span>
               </div>
             )}
             {outputTranscript && (
               <div>
-                <b>Gemini:</b>{" "}
-                <span style={{ color: "#1a73e8" }}>{outputTranscript}</span>
+                <b style={{ color: "#f64a8a" }}>Gemini:</b>{" "}
+                <span style={{ color: "#334155" }}>{outputTranscript}</span>
               </div>
             )}
           </div>
@@ -222,16 +299,27 @@ const GeminiAudioChatModal = ({
 
         {/* Emotion detection panel */}
         {emotionDetectionEnabled && (
-          <div style={{ marginTop: 20, textAlign: "left" }}>
+          <div
+            style={{
+              marginTop: 12,
+              textAlign: "left",
+              background: "#fdf2f8",
+              border: "1px solid #fbcfe8",
+              borderRadius: 8,
+              padding: isMobile ? "8px 10px" : "10px 14px",
+              fontSize: isMobile ? 12 : 13,
+            }}
+          >
             <b>Detected Emotion:</b>{" "}
-            <span>{emotion.aggregated || <i>Detecting...</i>}</span>
-            <br />
+            <span style={{ color: "#db2777", fontWeight: 600 }}>
+              {emotion.aggregated || <i>Detecting...</i>}
+            </span>
             {emotion.playback && (
-              <span style={{ color: "#888" }}>
-                <b>Playback Emotion:</b> {emotion.playback}
+              <span style={{ color: "#888", marginLeft: 8 }}>
+                (Playback: {emotion.playback})
               </span>
             )}
-            {/* Hidden webcam elements — managed by useEmotionDetection */}
+            {/* Hidden webcam elements */}
             <video ref={videoRef} style={{ display: "none" }} autoPlay playsInline width={128} height={96} />
             <canvas ref={canvasRef} style={{ display: "none" }} width={128} height={96} />
           </div>

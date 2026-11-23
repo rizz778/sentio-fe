@@ -5,6 +5,7 @@ import {
 import {
   SendOutlined, PlusOutlined, AudioOutlined,
   CameraOutlined, PhoneOutlined, MessageOutlined,
+  MenuUnfoldOutlined, MenuFoldOutlined,
 } from "@ant-design/icons";
 import { motion } from "framer-motion";
 
@@ -53,11 +54,22 @@ const ChatPage = () => {
   });
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+  const [collapsed, setCollapsed] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   const [isAudioModalVisible, setIsAudioModalVisible] = useState(false);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
   const [audioUrl, setAudioUrl] = useState("");
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setCollapsed(true);
+    };
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // ── Message helpers ───────────────────────────────────────────────────────
   // Appends to both the visible list and the audio modal history mirror
@@ -152,19 +164,38 @@ const ChatPage = () => {
       <video ref={videoRef} style={{ display: "none" }} autoPlay muted width="640" height="480" />
       <canvas ref={canvasRef} style={{ display: "none" }} width="640" height="480" />
 
-      <Layout style={{ height: "calc(100dvh - 80px)", minHeight: "calc(100vh - 80px)", overflow: "hidden" }}>
+      <Layout style={{ height: "calc(100dvh - 80px)", minHeight: "calc(100vh - 80px)", overflow: "hidden", position: "relative" }}>
+        {/* Mobile backdrop when sidebar is open */}
+        {isMobile && !collapsed && (
+          <div
+            onClick={() => setCollapsed(true)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0, 0, 0, 0.45)",
+              zIndex: 99,
+              backdropFilter: "blur(2px)",
+            }}
+          />
+        )}
+
         {/* Sidebar: session list + action buttons */}
         <Sider
-          width={260}
+          width={isMobile ? 260 : 260}
           collapsible
           collapsed={collapsed}
-          collapsedWidth={65}
+          collapsedWidth={isMobile ? 0 : 65}
           onCollapse={(val) => setCollapsed(val)}
           style={{
             height: "calc(100dvh - 80px)",
             background: "#f9a8d4",
             overflow: "hidden",
-            boxShadow: "2px 0 8px rgba(0,0,0,0.05)",
+            boxShadow: isMobile && !collapsed ? "4px 0 20px rgba(0,0,0,0.25)" : "2px 0 8px rgba(0,0,0,0.05)",
+            position: isMobile ? "absolute" : "relative",
+            zIndex: isMobile ? 100 : 1,
+            left: 0,
+            top: 0,
+            transition: "all 0.25s ease-in-out",
           }}
         >
           <div
@@ -176,10 +207,20 @@ const ChatPage = () => {
             }}
           >
             {/* Header: fixed at top */}
-            <div style={{ padding: "16px 12px", textAlign: "center", flexShrink: 0 }}>
-              <h3 style={{ color: "#fff", margin: 0, fontWeight: "bold", fontSize: collapsed ? "18px" : "16px" }}>
+            <div style={{ padding: "16px 12px", textAlign: "center", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h3 style={{ color: "#fff", margin: 0, fontWeight: "bold", fontSize: collapsed ? "18px" : "16px", flex: 1 }}>
                 {!collapsed ? "Chat Sessions" : "💬"}
               </h3>
+              {isMobile && !collapsed && (
+                <Button
+                  type="text"
+                  size="small"
+                  onClick={() => setCollapsed(true)}
+                  style={{ color: "#fff", fontWeight: "bold" }}
+                >
+                  ✕
+                </Button>
+              )}
             </div>
 
             {/* Session list – independently scrollable */}
@@ -199,6 +240,7 @@ const ChatPage = () => {
                 onClick={({ key }) => {
                   setActiveSession(key);
                   fetchMessages(key);
+                  if (isMobile) setCollapsed(true);
                 }}
                 style={{ background: "transparent", border: "none" }}
                 items={chatSessions.map((s, idx) => {
@@ -230,7 +272,10 @@ const ChatPage = () => {
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                onClick={() => createSession()}
+                onClick={() => {
+                  createSession();
+                  if (isMobile) setCollapsed(true);
+                }}
                 title="New Chat"
                 style={{
                   backgroundColor: "#ff4caf",
@@ -251,7 +296,10 @@ const ChatPage = () => {
               <Button
                 type="primary"
                 icon={<PhoneOutlined />}
-                onClick={() => setIsAudioModalVisible(true)}
+                onClick={() => {
+                  setIsAudioModalVisible(true);
+                  if (isMobile) setCollapsed(true);
+                }}
                 title="Switch to Audio"
                 style={{
                   backgroundColor: "#007AFF",
@@ -296,7 +344,7 @@ const ChatPage = () => {
         <Layout style={{ height: "calc(100dvh - 80px)", background: "#fff", overflow: "hidden" }}>
           <Content
             style={{
-              padding: "16px 20px",
+              padding: isMobile ? "8px 10px" : "16px 20px",
               display: "flex",
               flexDirection: "column",
               height: "100%",
@@ -304,14 +352,68 @@ const ChatPage = () => {
               overflow: "hidden",
             }}
           >
+            {/* Mobile Top Header */}
+            {isMobile && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "6px 8px",
+                  background: "#fff0f6",
+                  border: "1px solid #ffd6e7",
+                  borderRadius: 10,
+                  marginBottom: 8,
+                  flexShrink: 0,
+                }}
+              >
+                <Button
+                  icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={() => setCollapsed(!collapsed)}
+                  size="middle"
+                  style={{ border: "none", background: "transparent", fontSize: 16 }}
+                />
+                <span
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 14,
+                    color: "#9e1068",
+                    maxWidth: "50%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {chatSessions.find((s) => (s._id || s.sessionId) === activeSession)?.sessionName || "Sentio Chat"}
+                </span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <Button
+                    type="primary"
+                    shape="circle"
+                    size="middle"
+                    icon={<PhoneOutlined />}
+                    onClick={() => setIsAudioModalVisible(true)}
+                    style={{ backgroundColor: "#007AFF", borderColor: "#007AFF" }}
+                    title="Live Voice Call"
+                  />
+                  <Button
+                    shape="circle"
+                    size="middle"
+                    icon={<PlusOutlined />}
+                    onClick={() => createSession()}
+                    title="New Chat"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Messages scroll area */}
             <motion.div
               style={{
                 flex: 1,
                 overflowY: "auto",
-                marginBottom: "12px",
-                padding: "16px",
+                marginBottom: isMobile ? "8px" : "12px",
+                padding: isMobile ? "10px 8px" : "16px",
                 border: "1px solid #f0f0f0",
                 borderRadius: "12px",
                 background: "#fafafa",
@@ -324,15 +426,17 @@ const ChatPage = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   style={{
-                    marginBottom: "15px",
-                    padding: "12px 16px",
+                    marginBottom: isMobile ? "10px" : "15px",
+                    padding: isMobile ? "10px 12px" : "12px 16px",
                     borderRadius: "12px",
                     backgroundColor: msg.sender === "user" ? "#e6f7ff" : msg.sender === "bot" ? "#fff" : "#f0f0f0",
                     border: msg.sender === "bot" ? "1px solid #ffe4ed" : "none",
                     boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
                     marginLeft: msg.sender === "user" ? "auto" : "0",
                     marginRight: msg.sender === "user" ? "0" : "auto",
-                    maxWidth: "80%",
+                    maxWidth: isMobile ? "92%" : "80%",
+                    fontSize: isMobile ? "13.5px" : "14px",
+                    lineHeight: 1.5,
                   }}
                 >
                   <div style={{ marginBottom: "4px" }}>
@@ -378,9 +482,9 @@ const ChatPage = () => {
               style={{
                 flexShrink: 0,
                 display: "flex",
-                gap: "10px",
+                gap: isMobile ? "6px" : "10px",
                 alignItems: "center",
-                padding: "12px 16px",
+                padding: isMobile ? "8px 10px" : "12px 16px",
                 background: "#fafafa",
                 border: "1px solid #f0f0f0",
                 borderRadius: "12px",
@@ -390,20 +494,35 @@ const ChatPage = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
-                placeholder="Share what's on your mind..."
-                style={{ flex: 1, borderRadius: "8px", padding: "8px 12px" }}
+                placeholder={isMobile ? "Type a message..." : "Share what's on your mind..."}
+                style={{
+                  flex: 1,
+                  borderRadius: "8px",
+                  padding: isMobile ? "6px 10px" : "8px 12px",
+                  fontSize: isMobile ? "13.5px" : "14px",
+                }}
               />
 
-              {/* Voice toggle (UI only – wire SpeechRecognition here when ready) */}
-              <Button icon={<AudioOutlined />}
-                onClick={() => { setListening(!listening); antdMessage.info(listening ? "Voice input paused" : "Voice input ready"); }}
-                type={listening ? "primary" : "default"} danger={listening}
-                shape="circle" size="large"
-              />
+              {/* Quick live voice call button on mobile */}
+              {isMobile && (
+                <Button
+                  icon={<PhoneOutlined />}
+                  onClick={() => setIsAudioModalVisible(true)}
+                  shape="circle"
+                  size="middle"
+                  style={{ backgroundColor: "#e6f7ff", borderColor: "#91caff", color: "#007AFF" }}
+                  title="Live Voice Call"
+                />
+              )}
 
               {/* Send – disabled while Gemini is streaming */}
-              <Button icon={<SendOutlined />} onClick={handleSendMessage}
-                type="primary" disabled={isTyping} shape="circle" size="large"
+              <Button
+                icon={<SendOutlined />}
+                onClick={handleSendMessage}
+                type="primary"
+                disabled={isTyping}
+                shape="circle"
+                size={isMobile ? "middle" : "large"}
                 style={{ backgroundColor: "#f64a8a", borderColor: "#f64a8a" }}
               />
             </div>
