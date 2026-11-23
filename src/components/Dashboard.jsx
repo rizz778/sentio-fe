@@ -104,7 +104,7 @@ import {
           const result = await getDashboardAnalytics();
           
           if (result.success) {
-            setData(result.data);
+            setData(result.data || result.analytics);
           } else {
             throw new Error(result.message || 'Failed to fetch data');
           }
