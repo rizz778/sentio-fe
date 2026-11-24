@@ -7,10 +7,13 @@ import Benefits from "../components/Benefits.jsx";
 import Faq from "../components/Faq.jsx";
 import BuyToken from "./BuyToken.jsx";
 import Footer from "../components/Footer.jsx";
+import { useServerWarmup } from "../hooks/useServerWarmup";
+import ServerWarmupScreen from "../components/ServerWarmupScreen";
 
 const Home = () => {
   const audioRef = useRef(null);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
+  const { gatewayStatus, nodeStatus, showOverlay, elapsedSeconds, dismiss } = useServerWarmup();
 
   useEffect(() => {
     if (isPlayingMusic) {
@@ -33,6 +36,16 @@ const Home = () => {
 
   return (
     <section className="w-full relative overflow-hidden">
+      {/* Server warmup screen for Render free tier spin-down */}
+      {showOverlay && (
+        <ServerWarmupScreen
+          gatewayStatus={gatewayStatus}
+          nodeStatus={nodeStatus}
+          elapsedSeconds={elapsedSeconds}
+          dismiss={dismiss}
+        />
+      )}
+
       {/* Lightweight Ambient Hero Section (Zero 3D/WebGL overhead) */}
       <div className="w-full min-h-[90vh] py-16 sm:py-24 relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-[#ffe5ee] via-[#ffd6e5] to-[#f4faff]">
         {/* Soft, Calming Ambient Glowing Orbs in CSS */}

@@ -51,8 +51,29 @@ const resolveWsUrl = () => {
   return url;
 };
 
+// Determine base Node Backend REST URL for direct health warming
+const getRawNodeBackendUrl = () => {
+  return (
+    import.meta.env.VITE_NODE_BACKEND_URL ||
+    (typeof window !== "undefined" && !window.location.hostname.includes("localhost")
+      ? "https://sentio-node-backend.onrender.com"
+      : "http://localhost:5000")
+  ).trim().replace(/\/+$/, "");
+};
+
+const resolveNodeBackendUrl = () => {
+  let url = getRawNodeBackendUrl();
+  const isHttpsPage = typeof window !== "undefined" && window.location.protocol === "https:";
+  const isRemote = !url.includes("localhost") && !url.includes("127.0.0.1");
+  if ((isHttpsPage || isRemote) && url.startsWith("http://")) {
+    url = url.replace("http://", "https://");
+  }
+  return url;
+};
+
 export const GATEWAY_URL = resolveGatewayUrl();
 export const WS_GATEWAY_URL = resolveWsUrl();
+export const NODE_BACKEND_URL = resolveNodeBackendUrl();
 
 export const API_ENDPOINTS = {
   AUTH: {
