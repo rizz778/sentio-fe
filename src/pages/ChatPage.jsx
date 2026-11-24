@@ -389,13 +389,25 @@ const ChatPage = () => {
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <Button
                     type="primary"
-                    shape="circle"
-                    size="middle"
                     icon={<PhoneOutlined />}
                     onClick={() => setIsAudioModalVisible(true)}
-                    style={{ backgroundColor: "#007AFF", borderColor: "#007AFF" }}
+                    style={{
+                      background: "linear-gradient(135deg, #007AFF 0%, #0056b3 100%)",
+                      borderColor: "#007AFF",
+                      fontWeight: 600,
+                      borderRadius: "20px",
+                      fontSize: "12px",
+                      height: "32px",
+                      padding: "0 10px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      boxShadow: "0 2px 8px rgba(0, 122, 255, 0.35)",
+                    }}
                     title="Live Voice Call"
-                  />
+                  >
+                    <span>Voice Call</span>
+                  </Button>
                   <Button
                     shape="circle"
                     size="middle"
@@ -477,6 +489,71 @@ const ChatPage = () => {
               <div ref={messagesEndRef} />
             </motion.div>
 
+            {/* Prominent Live Voice Call CTA Banner on Mobile */}
+            {isMobile && (
+              <div
+                onClick={() => setIsAudioModalVisible(true)}
+                role="button"
+                tabIndex={0}
+                style={{
+                  flexShrink: 0,
+                  margin: "0 0 8px 0",
+                  padding: "9px 12px",
+                  background: "linear-gradient(135deg, #007AFF 0%, #7928CA 60%, #f64a8a 100%)",
+                  borderRadius: "14px",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  boxShadow: "0 3px 12px rgba(0, 122, 255, 0.28)",
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div
+                    style={{
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(255, 255, 255, 0.25)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "16px",
+                      backdropFilter: "blur(4px)",
+                    }}
+                  >
+                    🎙️
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "13px", lineHeight: 1.2 }}>
+                      Start Live Voice Call
+                    </div>
+                    <div style={{ fontSize: "10.5px", opacity: 0.9, marginTop: "1px" }}>
+                      Talk naturally with Gemini AI in real-time
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    backgroundColor: "rgba(255, 255, 255, 0.2)",
+                    padding: "4px 9px",
+                    borderRadius: "20px",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                  }}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#4ade80", display: "inline-block" }} />
+                  <span>Tap to Call</span>
+                </div>
+              </div>
+            )}
+
             {/* Input bar: sticky/fixed to bottom */}
             <div
               style={{
@@ -506,11 +583,16 @@ const ChatPage = () => {
               {/* Quick live voice call button on mobile */}
               {isMobile && (
                 <Button
-                  icon={<PhoneOutlined />}
+                  icon={<PhoneOutlined style={{ fontSize: "16px", color: "#fff" }} />}
                   onClick={() => setIsAudioModalVisible(true)}
                   shape="circle"
                   size="middle"
-                  style={{ backgroundColor: "#e6f7ff", borderColor: "#91caff", color: "#007AFF" }}
+                  style={{
+                    background: "linear-gradient(135deg, #007AFF 0%, #0056b3 100%)",
+                    borderColor: "#007AFF",
+                    boxShadow: "0 2px 8px rgba(0, 122, 255, 0.35)",
+                    flexShrink: 0,
+                  }}
                   title="Live Voice Call"
                 />
               )}
