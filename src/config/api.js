@@ -54,7 +54,7 @@ const resolveWsUrl = () => {
 // Determine base Node Backend REST URL for direct health warming
 const getRawNodeBackendUrl = () => {
   return (
-    import.meta.env.      ||
+    import.meta.env.VITE_NODE_BACKEND_URL ||
     (typeof window !== "undefined" && !window.location.hostname.includes("localhost")
       ? "https://sentio-node-backend.onrender.com"
       : "http://localhost:5000")
