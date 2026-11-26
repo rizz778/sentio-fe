@@ -299,7 +299,7 @@ const ChatPage = () => {
               >
                 {!collapsed && <span>New Chat</span>}
               </Button>
-              </Button>
+
 
               {/* Switch to Audio modal */}
               <Button
