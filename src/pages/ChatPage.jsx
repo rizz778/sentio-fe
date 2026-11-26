@@ -4,7 +4,7 @@ import {
 } from "antd";
 import {
   SendOutlined, PlusOutlined, AudioOutlined,
-  CameraOutlined, PhoneOutlined, MessageOutlined,
+  PhoneOutlined, MessageOutlined,
   MenuUnfoldOutlined, MenuFoldOutlined,
 } from "@ant-design/icons";
 import { motion } from "framer-motion";
@@ -13,7 +13,6 @@ import GeminiAudioChatModal from "../components/audio-test2";
 import { formatText, createMessageObject } from "../utils/chatUtils";
 
 import { useChatSessions } from "../hooks/useChatSessions";
-import { useEmotionDetection } from "../hooks/useEmotionDetection";
 import { useGeminiChat } from "../hooks/useGeminiChat";
 import { useDistressNotification } from "../hooks/useDistressNotification";
 
@@ -36,22 +35,6 @@ const ChatPage = () => {
     fetchMessages,
     messageIdRef,
   } = useChatSessions();
-
-  // ── Webcam emotion detection ──────────────────────────────────────────────
-  const {
-    emotion,
-    emotionDetectionEnabled,
-    setEmotionDetectionEnabled,
-    videoRef,
-    canvasRef,
-  } = useEmotionDetection(activeSession, {
-    onFrame: (frameMsg) => {
-      // Send camera frames through the existing Gemini WS connection (not a separate one)
-      if (sendWsMessage && isConnected) {
-        sendWsMessage(frameMsg);
-      }
-    },
-  });
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
@@ -99,7 +82,6 @@ const ChatPage = () => {
     activeSession,
     addMessage,
     addSystemMessage,
-    emotionRef: emotion,
     enabled: Boolean(activeSession),
   });
 
@@ -129,7 +111,7 @@ const ChatPage = () => {
       return;
     }
 
-    sendTurn(text, emotion.current);
+    sendTurn(text);
     addMessage("user", text);
     setInput("");
   };
@@ -160,10 +142,6 @@ const ChatPage = () => {
   // ==========================================================================
   return (
     <>
-      {/* Hidden elements for emotion detection (off-screen webcam capture) */}
-      <video ref={videoRef} style={{ display: "none" }} autoPlay muted width="640" height="480" />
-      <canvas ref={canvasRef} style={{ display: "none" }} width="640" height="480" />
-
       <Layout style={{ height: "calc(100dvh - 80px)", minHeight: "calc(100vh - 80px)", overflow: "hidden", position: "relative" }}>
         {/* Mobile backdrop when sidebar is open */}
         {isMobile && !collapsed && (
@@ -314,27 +292,6 @@ const ChatPage = () => {
                 }}
               >
                 {!collapsed && <span>Switch to Audio</span>}
-              </Button>
-
-              {/* Emotion detection toggle: green=off, red=on */}
-              <Button
-                type="primary"
-                icon={<CameraOutlined />}
-                onClick={() => setEmotionDetectionEnabled((p) => !p)}
-                title={emotionDetectionEnabled ? "Stop Emotion Capture" : "Capture Emotion"}
-                style={{
-                  backgroundColor: emotionDetectionEnabled ? "#d32f2f" : "#4CAF50",
-                  borderColor: emotionDetectionEnabled ? "#b71c1c" : "#388E3C",
-                  color: "white",
-                  fontWeight: "bold",
-                  borderRadius: "8px",
-                  height: "40px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {!collapsed && <span>{emotionDetectionEnabled ? "Stop Emotion Capture" : "Capture Emotion"}</span>}
               </Button>
             </div>
           </div>

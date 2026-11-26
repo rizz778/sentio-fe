@@ -21,7 +21,6 @@ import { Modal, Button, Alert } from "antd";
 import { useAudioLogger }         from "../hooks/useAudioLogger";
 import { useAudioPlayer }         from "../hooks/useAudioPlayer";
 import { useAudioRecorder }       from "../hooks/useAudioRecorder";
-import { useEmotionDetection }    from "../hooks/useEmotionDetection";
 import { useDistressNotification } from "../hooks/useDistressNotification";
 import { useAudioSession }        from "../hooks/useAudioSession";
 
@@ -48,15 +47,6 @@ const GeminiAudioChatModal = ({
     audioQueueLength,
   } = useAudioPlayer(addLog);
 
-  // ── Emotion detection ─────────────────────────────────────────────────────
-  const {
-    emotion,
-    emotionDetectionEnabled,
-    setEmotionDetectionEnabled,
-    videoRef,
-    canvasRef,
-  } = useEmotionDetection(sessionId);
-
   // ── UI state ──────────────────────────────────────────────────────────────
   const [isMuted, setIsMuted] = useState(false);
 
@@ -80,7 +70,6 @@ const GeminiAudioChatModal = ({
     reset: resetSession,
   } = useAudioSession({
     sessionId,
-    emotionState: emotion,
     isMuted,
     addLog,
     queueAudio,
@@ -125,13 +114,12 @@ const GeminiAudioChatModal = ({
   // ── Recording handlers ────────────────────────────────────────────────────
 
   const handleStartRecording = useCallback(async () => {
-    const currentEmotion = emotionDetectionEnabled ? emotion.aggregated || "" : "";
     await startRecording((pcmChunk) => {
       if (!isMuted) {
         sendAudio(pcmChunk);
       }
-    }, currentEmotion);
-  }, [emotionDetectionEnabled, emotion, startRecording, isMuted, sendAudio]);
+    });
+  }, [startRecording, isMuted, sendAudio]);
 
   const handleStopRecording = useCallback(async () => {
     await stopRecording();
@@ -187,16 +175,6 @@ const GeminiAudioChatModal = ({
       width="min(95vw, 540px)"
       style={{ top: isMobile ? 12 : 40, maxWidth: "96vw" }}
       footer={[
-        <Button
-          key="emotion"
-          onClick={() => setEmotionDetectionEnabled((v) => !v)}
-          type={emotionDetectionEnabled ? "primary" : "default"}
-          size={isMobile ? "small" : "middle"}
-        >
-          {emotionDetectionEnabled
-            ? (isMobile ? "Emotion: ON" : "Disable Emotion")
-            : (isMobile ? "Emotion: OFF" : "Enable Emotion")}
-        </Button>,
         <Button
           key="close"
           onClick={handleClose}
@@ -294,34 +272,6 @@ const GeminiAudioChatModal = ({
                 <span style={{ color: "#334155" }}>{outputTranscript}</span>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Emotion detection panel */}
-        {emotionDetectionEnabled && (
-          <div
-            style={{
-              marginTop: 12,
-              textAlign: "left",
-              background: "#fdf2f8",
-              border: "1px solid #fbcfe8",
-              borderRadius: 8,
-              padding: isMobile ? "8px 10px" : "10px 14px",
-              fontSize: isMobile ? 12 : 13,
-            }}
-          >
-            <b>Detected Emotion:</b>{" "}
-            <span style={{ color: "#db2777", fontWeight: 600 }}>
-              {emotion.aggregated || <i>Detecting...</i>}
-            </span>
-            {emotion.playback && (
-              <span style={{ color: "#888", marginLeft: 8 }}>
-                (Playback: {emotion.playback})
-              </span>
-            )}
-            {/* Hidden webcam elements */}
-            <video ref={videoRef} style={{ display: "none" }} autoPlay playsInline width={128} height={96} />
-            <canvas ref={canvasRef} style={{ display: "none" }} width={128} height={96} />
           </div>
         )}
       </div>
