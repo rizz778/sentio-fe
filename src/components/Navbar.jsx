@@ -140,21 +140,24 @@ const Navbar = () => {
         </div>
 
         {/* Center: Navigation Links */}
-        <nav className="hidden md:flex items-center gap-2 lg:gap-3">
+        <nav className="hidden md:flex items-center gap-1.5 lg:gap-2.5">
           <NavLink to="/" className={navLinkClass}>
             Home
-          </NavLink>
-          <NavLink to="/selfassessment" className={navLinkClass}>
-            Self Assessment
           </NavLink>
           <NavLink to="/chat" className={navLinkClass}>
             Chat
           </NavLink>
+          <NavLink to="/dashboard" className={navLinkClass}>
+            Dashboard
+          </NavLink>
+          <NavLink to="/profile" className={navLinkClass}>
+            Profile
+          </NavLink>
           <NavLink to="/therapists" className={navLinkClass}>
             Therapists
           </NavLink>
-          <NavLink to="/twotabpage" className={navLinkClass}>
-            Support Center
+          <NavLink to="/selfassessment" className={navLinkClass}>
+            Assessment
           </NavLink>
           <NavLink to="/tabpage" className={navLinkClass}>
             Resources
@@ -177,18 +180,27 @@ const Navbar = () => {
       </div>
 
       {/* Mobile Nav Drawer Row */}
-      <div className="md:hidden flex overflow-x-auto px-4 py-2 gap-2 border-t border-white/20 no-scrollbar">
+      <div className="md:hidden flex overflow-x-auto px-3 py-2 gap-2 border-t border-white/20 no-scrollbar">
         <NavLink to="/" className={navLinkClass}>
           Home
-        </NavLink>
-        <NavLink to="/selfassessment" className={navLinkClass}>
-          Assessments
         </NavLink>
         <NavLink to="/chat" className={navLinkClass}>
           Chat
         </NavLink>
+        <NavLink to="/dashboard" className={navLinkClass}>
+          Dashboard
+        </NavLink>
+        <NavLink to="/profile" className={navLinkClass}>
+          Profile
+        </NavLink>
         <NavLink to="/therapists" className={navLinkClass}>
           Therapists
+        </NavLink>
+        <NavLink to="/selfassessment" className={navLinkClass}>
+          Assessment
+        </NavLink>
+        <NavLink to="/tabpage" className={navLinkClass}>
+          Resources
         </NavLink>
         <NavLink to="/about" className={navLinkClass}>
           About

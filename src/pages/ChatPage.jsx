@@ -90,9 +90,19 @@ const ChatPage = () => {
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, currentResponse]);
+
+  // ── Create Chat with mobile scroll-to-top ──────────────────────────────────
+  const handleCreateChat = async () => {
+    await createSession();
+    if (isMobile) setCollapsed(true);
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   // ── Refresh Gemini context when session switches ───────────────────────────
   useEffect(() => {
@@ -142,7 +152,7 @@ const ChatPage = () => {
   // ==========================================================================
   return (
     <>
-      <Layout style={{ height: "calc(100dvh - 80px)", minHeight: "calc(100vh - 80px)", overflow: "hidden", position: "relative" }}>
+      <Layout style={{ height: isMobile ? "calc(100dvh - 128px)" : "calc(100dvh - 80px)", minHeight: isMobile ? "calc(100vh - 128px)" : "calc(100vh - 80px)", overflow: "hidden", position: "relative" }}>
         {/* Mobile backdrop when sidebar is open */}
         {isMobile && !collapsed && (
           <div
@@ -165,7 +175,7 @@ const ChatPage = () => {
           collapsedWidth={isMobile ? 0 : 65}
           onCollapse={(val) => setCollapsed(val)}
           style={{
-            height: "calc(100dvh - 80px)",
+            height: isMobile ? "calc(100dvh - 128px)" : "calc(100dvh - 80px)",
             background: "#f9a8d4",
             overflow: "hidden",
             boxShadow: isMobile && !collapsed ? "4px 0 20px rgba(0,0,0,0.25)" : "2px 0 8px rgba(0,0,0,0.05)",
@@ -184,11 +194,34 @@ const ChatPage = () => {
               overflow: "hidden",
             }}
           >
-            {/* Header: fixed at top */}
-            <div style={{ padding: "16px 12px", textAlign: "center", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <h3 style={{ color: "#fff", margin: 0, fontWeight: "bold", fontSize: collapsed ? "18px" : "16px", flex: 1 }}>
+            {/* Header: fixed at top with quick New Chat button */}
+            <div style={{ padding: "14px 12px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+              <h3 style={{ color: "#fff", margin: 0, fontWeight: "bold", fontSize: collapsed ? "18px" : "15px", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {!collapsed ? "Chat Sessions" : "💬"}
               </h3>
+              {!collapsed && (
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={handleCreateChat}
+                  style={{
+                    backgroundColor: "#ff4caf",
+                    borderColor: "#d9363e",
+                    color: "white",
+                    fontWeight: "bold",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "0 8px",
+                  }}
+                  title="New Chat"
+                >
+                  New
+                </Button>
+              )}
               {isMobile && !collapsed && (
                 <Button
                   type="text"
@@ -250,10 +283,7 @@ const ChatPage = () => {
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                onClick={() => {
-                  createSession();
-                  if (isMobile) setCollapsed(true);
-                }}
+                onClick={handleCreateChat}
                 title="New Chat"
                 style={{
                   backgroundColor: "#ff4caf",
@@ -268,6 +298,7 @@ const ChatPage = () => {
                 }}
               >
                 {!collapsed && <span>New Chat</span>}
+              </Button>
               </Button>
 
               {/* Switch to Audio modal */}
@@ -298,7 +329,7 @@ const ChatPage = () => {
         </Sider>
 
         {/* Main chat content */}
-        <Layout style={{ height: "calc(100dvh - 80px)", background: "#fff", overflow: "hidden" }}>
+        <Layout style={{ height: isMobile ? "calc(100dvh - 128px)" : "calc(100dvh - 80px)", background: "#fff", overflow: "hidden" }}>
           <Content
             style={{
               padding: isMobile ? "8px 10px" : "16px 20px",
@@ -322,6 +353,9 @@ const ChatPage = () => {
                   borderRadius: 10,
                   marginBottom: 8,
                   flexShrink: 0,
+                  position: "sticky",
+                  top: 0,
+                  zIndex: 10,
                 }}
               >
                 <Button
@@ -369,7 +403,7 @@ const ChatPage = () => {
                     shape="circle"
                     size="middle"
                     icon={<PlusOutlined />}
-                    onClick={() => createSession()}
+                    onClick={handleCreateChat}
                     title="New Chat"
                   />
                 </div>
@@ -378,6 +412,7 @@ const ChatPage = () => {
 
             {/* Messages scroll area */}
             <motion.div
+              ref={messagesContainerRef}
               style={{
                 flex: 1,
                 overflowY: "auto",
@@ -524,6 +559,22 @@ const ChatPage = () => {
                 borderRadius: "12px",
               }}
             >
+              {/* Quick New Chat button on mobile (no need to scroll up) */}
+              {isMobile && (
+                <Button
+                  icon={<PlusOutlined style={{ fontSize: "15px", color: "#f64a8a" }} />}
+                  onClick={handleCreateChat}
+                  shape="circle"
+                  size="middle"
+                  style={{
+                    backgroundColor: "#fff0f6",
+                    borderColor: "#ffd6e7",
+                    flexShrink: 0,
+                  }}
+                  title="New Chat"
+                />
+              )}
+
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
